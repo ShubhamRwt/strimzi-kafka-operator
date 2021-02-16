@@ -3,8 +3,10 @@
  * License: Apache License 2.0 (see the file LICENSE or http://apache.org/licenses/LICENSE-2.0.html).
  */
 package io.strimzi.operator.cluster.operator.assembly;
-
+import io.fabric8.kubernetes.api.model.ConfigMap;
+import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
@@ -50,6 +52,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -134,11 +137,9 @@ public class KafkaRebalanceAssemblyOperator
     private static final long REBALANCE_POLLING_TIMER_MS = 5_000;
     private static final int MAX_API_RETRIES = 5;
     protected static final String BROKER_LOAD_KEY = "brokerLoad";
-
     private final CrdOperator<KubernetesClient, KafkaRebalance, KafkaRebalanceList> kafkaRebalanceOperator;
     private final CrdOperator<KubernetesClient, Kafka, KafkaList> kafkaOperator;
     private final PlatformFeaturesAvailability pfa;
-
     /**
      * @param vertx The Vertx instance
      * @param pfa Platform features availability properties
@@ -557,6 +558,19 @@ public class KafkaRebalanceAssemblyOperator
                 proposalJson.getJsonObject(CruiseControlRebalanceKeys.SUMMARY.getKey()).getMap());
         optimizationProposal.put(BROKER_LOAD_KEY, beforeAndAfterBrokerLoad);
 
+        String mapAsString = beforeAndAfterBrokerLoad.keySet().stream()
+                .map(key -> key + "\n" + converttoformat(beforeAndAfterBrokerLoad.get(key)) + "\n")
+                .collect(Collectors.joining(", ", "{", "}"));
+        ConfigMap rebalanceMap = new ConfigMapBuilder()
+                .withApiVersion("v1")
+                .withNewMetadata()
+                .withName("kafka-rebalance-before-after-load")
+                .withLabels(Collections.singletonMap("app", "strimzi"))
+                .endMetadata()
+                .withData(Collections.singletonMap(BROKER_LOAD_KEY, mapAsString))
+                .build();
+        KubernetesClient kubernetesClient = new DefaultKubernetesClient();
+        kubernetesClient.configMaps().inNamespace("myproject").createOrReplace(rebalanceMap);
         return optimizationProposal;
     }
 
@@ -569,15 +583,37 @@ public class KafkaRebalanceAssemblyOperator
                 .build();
     }
 
+    private static String converttoformat(Map<String, Object> map) {
+
+        StringBuilder mapAsString = new StringBuilder("{");
+        for (String key : map.keySet()) {
+            mapAsString.append(key).append("\n").append(Objecttoarray(map.get(key))).append(",\n");
+        }
+        mapAsString.delete(mapAsString.length() - 2, mapAsString.length()).append("}");
+
+        return mapAsString.toString();
+    }
+
+    private static String Objecttoarray(Object obj) {
+
+        String myarray = "";
+
+        if (obj.getClass().isArray()) {
+            if (obj.getClass().getComponentType().equals(int.class)) {
+                int[] numbers = (int[]) obj;
+                myarray += "Before: " + numbers[0] + "\n" + "After: " + numbers[1] + "\n" + "Diff: " + numbers[2] + "\n";
+            } else {
+                double[] numbers = (double[]) obj;
+                myarray += "Before: " + numbers[0] + "\n" + "After: " + numbers[1] + "\n" + "Diff: " + numbers[2] + "\n";
+            }
+        }
+        return myarray;
+    }
+
     /**
-<<<<<<< HEAD
      * This method handles the transition from the {@code New} state.
      * When a new {@code KafkaRebalance} is created, it calls the Cruise Control API requesting a rebalance proposal.
      *
-=======
-     * This method handles the transition from {@code New} state.
-     * When a new {@link KafkaRebalance} is created, it calls the Cruise Control API for requesting a rebalance proposal.
->>>>>>> 7439c8537 (Reformatted optimization proposals to add before and after cluster load information)
      * If the proposal is immediately ready, the next state is {@code ProposalReady}.
      * If the proposal is not ready yet and Cruise Control is still processing it, the next state is {@code PendingProposal}.
      *
