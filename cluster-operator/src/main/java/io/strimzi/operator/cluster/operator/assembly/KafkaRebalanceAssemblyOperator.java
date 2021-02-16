@@ -556,7 +556,7 @@ public class KafkaRebalanceAssemblyOperator
         Map<String, Object> optimizationProposal = new HashMap<>();
         optimizationProposal.put(CruiseControlRebalanceKeys.SUMMARY.getKey(),
                 proposalJson.getJsonObject(CruiseControlRebalanceKeys.SUMMARY.getKey()).getMap());
-        optimizationProposal.put(BROKER_LOAD_KEY, beforeAndAfterBrokerLoad);
+//        optimizationProposal.put(BROKER_LOAD_KEY, beforeAndAfterBrokerLoad);
 
         String mapAsString = beforeAndAfterBrokerLoad.keySet().stream()
                 .map(key -> key + "\n" + converttoformat(beforeAndAfterBrokerLoad.get(key)) + "\n")
