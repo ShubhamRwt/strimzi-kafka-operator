@@ -3,8 +3,6 @@
  * License: Apache License 2.0 (see the file LICENSE or http://apache.org/licenses/LICENSE-2.0.html).
  */
 package io.strimzi.operator.cluster.operator.assembly;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
@@ -568,20 +566,14 @@ public class KafkaRebalanceAssemblyOperator
         optimizationProposal.put(CruiseControlRebalanceKeys.SUMMARY.getKey(),
                 proposalJson.getJsonObject(CruiseControlRebalanceKeys.SUMMARY.getKey()).getMap());
 
-        ObjectMapper mapper = new ObjectMapper();
-        ConfigMap rebalanceMap = null;
-        try {
-            rebalanceMap = new ConfigMapBuilder()
-                    .withApiVersion("v1")
-                    .withNewMetadata()
-                    .withName(kafkaRebalance.getMetadata().getName())
-                    .withLabels(Collections.singletonMap("app", "strimzi"))
-                    .endMetadata()
-                    .withData(Collections.singletonMap(BROKER_LOAD_KEY, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(beforeAndAfterBrokerLoad)))
-                    .build();
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-        }
+        ConfigMap rebalanceMap = new ConfigMapBuilder()
+                .withApiVersion("v1")
+                .withNewMetadata()
+                .withName(kafkaRebalance.getMetadata().getName())
+                .withLabels(Collections.singletonMap("app", "strimzi"))
+                .endMetadata()
+                .withData(Collections.singletonMap(BROKER_LOAD_KEY, beforeAndAfterBrokerLoad.encodePrettily()))
+                .build();
         KubernetesClient kubernetesClient = new DefaultKubernetesClient();
         kubernetesClient.configMaps().inNamespace(kafkaRebalance.getMetadata().getNamespace()).createOrReplace(rebalanceMap);
         return optimizationProposal;
