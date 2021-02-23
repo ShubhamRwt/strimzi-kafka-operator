@@ -5,11 +5,7 @@
 package io.strimzi.operator.cluster.operator.assembly;
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
-import io.fabric8.kubernetes.client.KubernetesClient;
-import io.fabric8.kubernetes.client.DefaultKubernetesClient;
-import io.fabric8.kubernetes.client.KubernetesClientException;
-import io.fabric8.kubernetes.client.Watcher;
-import io.fabric8.kubernetes.client.WatcherException;
+import io.fabric8.kubernetes.client.*;
 import io.fabric8.kubernetes.client.dsl.Resource;
 import io.strimzi.api.kafka.KafkaRebalanceList;
 import io.strimzi.api.kafka.KafkaList;
@@ -41,6 +37,7 @@ import io.strimzi.operator.common.Reconciliation;
 import io.strimzi.operator.common.Util;
 import io.strimzi.operator.common.model.Labels;
 import io.strimzi.operator.common.operator.resource.AbstractWatchableStatusedResourceOperator;
+import io.strimzi.operator.common.operator.resource.ConfigMapOperator;
 import io.strimzi.operator.common.operator.resource.CrdOperator;
 import io.strimzi.operator.common.operator.resource.StatusUtils;
 import io.vertx.core.Future;
@@ -139,7 +136,9 @@ public class KafkaRebalanceAssemblyOperator
     protected static final String BROKER_LOAD_KEY = "brokerLoad";
     private final CrdOperator<KubernetesClient, KafkaRebalance, KafkaRebalanceList> kafkaRebalanceOperator;
     private final CrdOperator<KubernetesClient, Kafka, KafkaList> kafkaOperator;
+    public static JsonObject proposal;
     private final PlatformFeaturesAvailability pfa;
+    private final ConfigMapOperator configMapOperator;
     /**
      * @param vertx The Vertx instance
      * @param pfa Platform features availability properties
@@ -151,6 +150,7 @@ public class KafkaRebalanceAssemblyOperator
         this.pfa = pfa;
         this.kafkaRebalanceOperator = supplier.kafkaRebalanceOperator;
         this.kafkaOperator = supplier.kafkaOperator;
+        this.configMapOperator = supplier.configMapOperations;
     }
 
     /**
@@ -323,6 +323,18 @@ public class KafkaRebalanceAssemblyOperator
                                    Set<Condition> unknownAndDeprecatedConditions) {
 
         log.info("{}: Rebalance action from state [{}]", reconciliation, currentState);
+        log.info("" + kafkaRebalance.getMetadata().getNamespace());
+        log.info("" + reconciliation.namespace());
+
+        ConfigMap rebalanceMap = new ConfigMapBuilder()
+                .withApiVersion("v1")
+                .withNewMetadata()
+                .withNamespace(kafkaRebalance.getMetadata().getNamespace())
+                .withName(kafkaRebalance.getMetadata().getName())
+                .withLabels(Collections.singletonMap("app", "strimzi"))
+                .endMetadata()
+                .withData(Collections.singletonMap(BROKER_LOAD_KEY, "hi"))
+                .build();
 
         RebalanceOptions.RebalanceOptionsBuilder rebalanceOptionsBuilder = convertRebalanceSpecToRebalanceOptions(kafkaRebalance.getSpec());
 
@@ -335,7 +347,9 @@ public class KafkaRebalanceAssemblyOperator
                             .compose(currentKafkaRebalance -> {
                                 if (currentKafkaRebalance != null) {
                                     addWarningsToStatus(desiredStatus, unknownAndDeprecatedConditions);
-                                    return updateStatus(currentKafkaRebalance, desiredStatus, null)
+                                    return configMapOperator.reconcile(kafkaRebalance.getMetadata().getNamespace(),
+                                            kafkaRebalance.getMetadata().getName(), rebalanceMap)
+                                            .compose(i -> updateStatus(currentKafkaRebalance, desiredStatus, null))
                                             .compose(updatedKafkaRebalance -> {
                                                 log.info("{}: State updated to [{}] with annotation {}={} ",
                                                         reconciliation,
@@ -374,7 +388,7 @@ public class KafkaRebalanceAssemblyOperator
                    log.error("{}: Status updated to [NotReady] due to error: {}", reconciliation, exception.getMessage());
                    return updateStatus(kafkaRebalance, new KafkaRebalanceStatus(), exception)
                        .mapEmpty();
-               });
+               }).compose(ignore -> configMapOperator.reconcile(kafkaRebalance.getMetadata().getNamespace(), kafkaRebalance.getMetadata().getName(), rebalanceMap).map((Void) null));
     }
 
     /**
@@ -535,6 +549,18 @@ public class KafkaRebalanceAssemblyOperator
 
     }
 
+    static class MapandStatus {
+
+        ConfigMap loadMap;
+
+        KafkaRebalanceStatus status;
+
+        public MapandStatus(ConfigMap loadMap, KafkaRebalanceStatus status) {
+            this.loadMap = loadMap;
+            this.status = status;
+        }
+    }
+
     /**
      * Converts the supplied JSONObject containing the response from the {@link CruiseControlApi#rebalance} or
      * {@link CruiseControlApi#getUserTaskStatus} methods, into a map linking to a proposal summary map and a broker
@@ -565,17 +591,7 @@ public class KafkaRebalanceAssemblyOperator
         Map<String, Object> optimizationProposal = new HashMap<>();
         optimizationProposal.put(CruiseControlRebalanceKeys.SUMMARY.getKey(),
                 proposalJson.getJsonObject(CruiseControlRebalanceKeys.SUMMARY.getKey()).getMap());
-
-        ConfigMap rebalanceMap = new ConfigMapBuilder()
-                .withApiVersion("v1")
-                .withNewMetadata()
-                .withName(kafkaRebalance.getMetadata().getName())
-                .withLabels(Collections.singletonMap("app", "strimzi"))
-                .endMetadata()
-                .withData(Collections.singletonMap(BROKER_LOAD_KEY, beforeAndAfterBrokerLoad.encodePrettily()))
-                .build();
-        KubernetesClient kubernetesClient = new DefaultKubernetesClient();
-        kubernetesClient.configMaps().inNamespace(kafkaRebalance.getMetadata().getNamespace()).createOrReplace(rebalanceMap);
+        proposal = beforeAndAfterBrokerLoad;
         return optimizationProposal;
     }
 
