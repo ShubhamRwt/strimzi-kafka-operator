@@ -549,13 +549,29 @@ public class KafkaRebalanceAssemblyOperator
 
     }
 
-    static class MapandStatus {
+    static class MapandStatus<T, K> {
 
-        ConfigMap loadMap;
+        T loadMap;
 
-        KafkaRebalanceStatus status;
+        K status;
 
-        public MapandStatus(ConfigMap loadMap, KafkaRebalanceStatus status) {
+        public T getLoadMap() {
+            return loadMap;
+        }
+
+        public void setLoadMap(T loadMap) {
+            this.loadMap = loadMap;
+        }
+
+        public K getStatus() {
+            return status;
+        }
+
+        public void setStatus(K status) {
+            this.status = status;
+        }
+
+        public MapandStatus(T loadMap, K status) {
             this.loadMap = loadMap;
             this.status = status;
         }
@@ -569,7 +585,7 @@ public class KafkaRebalanceAssemblyOperator
      * @param  proposalJson The JSONObject representing the response from the Cruise Control rebalance endpoint.
      * @return A map containing the proposal summary and broker load maps.
      */
-    protected static Map<String, Object> processOptimizationProposal(KafkaRebalance kafkaRebalance, JsonObject proposalJson) {
+    protected static MapandStatus<ConfigMap, Map<String, Object>> processOptimizationProposal(KafkaRebalance kafkaRebalance, JsonObject proposalJson) {
 
         JsonArray brokerLoadBeforeOptimization;
         JsonArray brokerLoadAfterOptimization;
@@ -588,20 +604,31 @@ public class KafkaRebalanceAssemblyOperator
         JsonObject beforeAndAfterBrokerLoad = parseLoadStats(
                 brokerLoadBeforeOptimization, brokerLoadAfterOptimization);
 
+        ConfigMap rebalanceMap = new ConfigMapBuilder()
+                .withApiVersion("v1")
+                .withNewMetadata()
+                .withNamespace(kafkaRebalance.getMetadata().getNamespace())
+                .withName(kafkaRebalance.getMetadata().getName())
+                .withLabels(Collections.singletonMap("app", "strimzi"))
+                .endMetadata()
+                .withData(Collections.singletonMap(BROKER_LOAD_KEY, "hi"))
+                .build();
+
         Map<String, Object> optimizationProposal = new HashMap<>();
         optimizationProposal.put(CruiseControlRebalanceKeys.SUMMARY.getKey(),
                 proposalJson.getJsonObject(CruiseControlRebalanceKeys.SUMMARY.getKey()).getMap());
         proposal = beforeAndAfterBrokerLoad;
-        return optimizationProposal;
+
+        return new MapandStatus<>(rebalanceMap, optimizationProposal);
     }
 
-    private KafkaRebalanceStatus buildRebalanceStatus(KafkaRebalance kafkaRebalance, String sessionID, KafkaRebalanceState cruiseControlState, JsonObject proposalJson) {
-        Map<String, Object> optimizationProposal = processOptimizationProposal(kafkaRebalance, proposalJson);
-        return new KafkaRebalanceStatusBuilder()
+    private MapandStatus<ConfigMap, KafkaRebalanceStatus> buildRebalanceStatus(KafkaRebalance kafkaRebalance, String sessionID, KafkaRebalanceState cruiseControlState, JsonObject proposalJson) {
+        MapandStatus<ConfigMap, Map<String, Object>> optimizationProposalMapandstatus = processOptimizationProposal(kafkaRebalance, proposalJson);
+        return new MapandStatus<>(optimizationProposalMapandstatus.getLoadMap(), new KafkaRebalanceStatusBuilder()
                 .withSessionId(sessionID)
                 .withConditions(StatusUtils.buildRebalanceCondition(cruiseControlState.toString()))
-                .withOptimizationResult(optimizationProposal)
-                .build();
+                .withOptimizationResult(optimizationProposalMapandstatus.getStatus())
+                .build());
     }
 
     /**
@@ -787,7 +814,7 @@ public class KafkaRebalanceAssemblyOperator
      * @param rebalanceAnnotation The current value for the strimzi.io/rebalance annotation
      * @return a Future with the next {@code KafkaRebalanceStatus} including the state
      */
-    private Future<KafkaRebalanceStatus> onRebalancing(Reconciliation reconciliation,
+    private Future<MapandStatus<ConfigMap, KafkaRebalanceStatus>> onRebalancing(Reconciliation reconciliation,
                                                        String host, CruiseControlApi apiClient,
                                                        KafkaRebalance kafkaRebalance,
                                                        KafkaRebalanceAnnotation rebalanceAnnotation) {
@@ -829,7 +856,7 @@ public class KafkaRebalanceAssemblyOperator
                                                     vertx.cancelTimer(t);
                                                     log.info("{}: Rebalance ({}) is now complete", reconciliation, sessionId);
                                                     p.complete(buildRebalanceStatus(
-                                                            kafkaRebalance, null, KafkaRebalanceState.Ready, taskStatusJson));
+                                                            kafkaRebalance, null, KafkaRebalanceState.Ready, taskStatusJson).getStatus());
                                                     break;
                                                 case COMPLETED_WITH_ERROR:
                                                     // TODO: There doesn't seem to be a way to retrieve the actual error message from the user tasks endpoint?
@@ -851,7 +878,7 @@ public class KafkaRebalanceAssemblyOperator
                                                         // Cancel the timer so that the status is returned and updated.
                                                         vertx.cancelTimer(t);
                                                         p.complete(buildRebalanceStatus(
-                                                                kafkaRebalance, sessionId, KafkaRebalanceState.Rebalancing, taskStatusJson));
+                                                                kafkaRebalance, sessionId, KafkaRebalanceState.Rebalancing, taskStatusJson).getStatus() );
                                                     }
                                                     ccApiErrorCount.set(0);
                                                     // TODO: Find out if there is any way to check the progress of a rebalance.
@@ -880,7 +907,7 @@ public class KafkaRebalanceAssemblyOperator
                                         });
                                 }
                             } else {
-                                p.complete(currentKafkaRebalance.getStatus());
+                                p.complete(new MapandStatus<>(null,currentKafkaRebalance.getStatus()));
                             }
                         } else {
                             log.debug("{}: Rebalance resource was deleted, stopping the request time", reconciliation);
