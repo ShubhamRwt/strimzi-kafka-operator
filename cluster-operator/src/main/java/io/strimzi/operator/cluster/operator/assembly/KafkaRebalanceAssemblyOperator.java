@@ -6,6 +6,7 @@ package io.strimzi.operator.cluster.operator.assembly;
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
@@ -139,7 +140,6 @@ public class KafkaRebalanceAssemblyOperator
     protected static final String BROKER_LOAD_KEY = "brokerLoad";
     private final CrdOperator<KubernetesClient, KafkaRebalance, KafkaRebalanceList> kafkaRebalanceOperator;
     private final CrdOperator<KubernetesClient, Kafka, KafkaList> kafkaOperator;
-    public static JsonObject proposal;
     private final PlatformFeaturesAvailability pfa;
     private final ConfigMapOperator configMapOperator;
     /**
@@ -610,8 +610,6 @@ public class KafkaRebalanceAssemblyOperator
         Map<String, Object> optimizationProposal = new HashMap<>();
         optimizationProposal.put(CruiseControlRebalanceKeys.SUMMARY.getKey(),
                 proposalJson.getJsonObject(CruiseControlRebalanceKeys.SUMMARY.getKey()).getMap());
-        proposal = beforeAndAfterBrokerLoad;
-
         return new MapandStatus<>(rebalanceMap, optimizationProposal);
     }
 
