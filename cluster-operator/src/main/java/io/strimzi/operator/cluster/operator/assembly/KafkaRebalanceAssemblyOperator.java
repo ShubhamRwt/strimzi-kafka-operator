@@ -333,6 +333,8 @@ public class KafkaRebalanceAssemblyOperator
 
         return computeNextStatus(reconciliation, host, apiClient, kafkaRebalance, currentState, rebalanceAnnotation, rebalanceOptionsBuilder)
            .compose(desiredStatusandMap -> {
+
+
                // More events related to resource modification might be queued with a stale state. (potentially updated by the rebalance holding the lock)
                // Due to possible long rebalancing operations that take the lock for the entire period,
                // do a new get to retrieve the current resource state.
