@@ -6,7 +6,6 @@ package io.strimzi.operator.cluster.operator.assembly;
 import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
-import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
@@ -334,6 +333,8 @@ public class KafkaRebalanceAssemblyOperator
         return computeNextStatus(reconciliation, host, apiClient, kafkaRebalance, currentState, rebalanceAnnotation, rebalanceOptionsBuilder)
            .compose(desiredStatusandMap -> {
 
+                       System.out.println(desiredStatusandMap.status);
+                       System.out.println(desiredStatusandMap.loadMap);
 
                // More events related to resource modification might be queued with a stale state. (potentially updated by the rebalance holding the lock)
                // Due to possible long rebalancing operations that take the lock for the entire period,

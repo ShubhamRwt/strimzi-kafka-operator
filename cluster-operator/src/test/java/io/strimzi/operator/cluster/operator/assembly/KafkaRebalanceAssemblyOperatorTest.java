@@ -81,7 +81,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
             .withName(RESOURCE_NAME)
             .withLabels(Collections.singletonMap("app", "strimzi"))
             .endMetadata()
-            .withData(Collections.singletonMap("dummy", "hi"))
+            .withData(Collections.singletonMap("dummy", "dummytext"))
             .build();
 
     private final KubernetesVersion kubernetesVersion = KubernetesVersion.V1_18;
@@ -186,7 +186,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME))
             .thenReturn(Future.succeededFuture(kafka));
 
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps,mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -220,7 +220,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME))
             .thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -265,7 +265,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME))
             .thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient, new Runnable() {
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient, new Runnable() {
                 int count = 0;
 
                 @Override
@@ -327,7 +327,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         Crds.kafkaRebalanceOperation(kubernetesClient).inNamespace(CLUSTER_NAMESPACE).create(kr);
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient, new Runnable() {
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient, new Runnable() {
                 int count = 0;
 
                 @Override
@@ -413,7 +413,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         Crds.kafkaRebalanceOperation(kubernetesClient).inNamespace(CLUSTER_NAMESPACE).create(kr);
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -472,7 +472,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
 
         // the Kafka cluster isn't deployed in the namespace
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -515,7 +515,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         Crds.kafkaRebalanceOperation(kubernetesClient).inNamespace(CLUSTER_NAMESPACE).create(kr);
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -556,7 +556,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
 
         // the Kafka cluster isn't deployed in the namespace
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -631,7 +631,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         Crds.kafkaRebalanceOperation(kubernetesClient).inNamespace(CLUSTER_NAMESPACE).create(kr);
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient, new Runnable() {
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient, new Runnable() {
                 int count = 0;
 
                 @Override
@@ -699,7 +699,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         Crds.kafkaRebalanceOperation(kubernetesClient).inNamespace(CLUSTER_NAMESPACE).create(kr);
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient, new Runnable() {
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient, new Runnable() {
                 int count = 0;
 
                 @Override
@@ -762,7 +762,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
 
         // the Kafka cluster isn't deployed in the namespace
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(null));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(
@@ -798,7 +798,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME))
                 .thenReturn(Future.succeededFuture(kafka));
 
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -837,7 +837,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
 
         // the Kafka cluster doesn't have the Cruise Control deployment
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -866,7 +866,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         Crds.kafkaRebalanceOperation(kubernetesClient).inNamespace(CLUSTER_NAMESPACE).create(kr);
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -899,7 +899,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         Crds.kafkaRebalanceOperation(kubernetesClient).inNamespace(CLUSTER_NAMESPACE).create(kr);
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -931,7 +931,7 @@ public class KafkaRebalanceAssemblyOperatorTest {
         Crds.kafkaRebalanceOperation(kubernetesClient).inNamespace(CLUSTER_NAMESPACE).create(kr);
 
         when(mockKafkaOps.getAsync(CLUSTER_NAMESPACE, CLUSTER_NAME)).thenReturn(Future.succeededFuture(kafka));
-        mockRebalanceOperator(mockRebalanceOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, CLUSTER_NAMESPACE, RESOURCE_NAME, kubernetesClient);
 
         Checkpoint checkpoint = context.checkpoint();
         kcrao.reconcileRebalance(new Reconciliation("test-trigger", KafkaRebalance.RESOURCE_KIND, CLUSTER_NAMESPACE, RESOURCE_NAME), kr)
@@ -1018,13 +1018,13 @@ public class KafkaRebalanceAssemblyOperatorTest {
                 .build();
     }
 
-    private void mockRebalanceOperator(CrdOperator<KubernetesClient, KafkaRebalance, KafkaRebalanceList> mockRebalanceOps,
+    private void mockRebalanceOperator(CrdOperator<KubernetesClient, KafkaRebalance, KafkaRebalanceList> mockRebalanceOps, ConfigMapOperator mockCmOps,
                                        String namespace, String resource, KubernetesClient client) {
-        mockRebalanceOperator(mockRebalanceOps, namespace, resource, client, null);
+        mockRebalanceOperator(mockRebalanceOps, mockCmOps, namespace, resource, client, null);
     }
 
     private void mockRebalanceOperator(CrdOperator<KubernetesClient, KafkaRebalance, KafkaRebalanceList> mockRebalanceOps,
-                                       String namespace, String resource, KubernetesClient client, Runnable getAsyncFunction) {
+                                       ConfigMapOperator mockCmOps, String namespace, String resource, KubernetesClient client, Runnable getAsyncFunction) {
 
 
         when(mockRebalanceOps.getAsync(namespace, resource)).thenAnswer(invocation -> {
@@ -1050,10 +1050,6 @@ public class KafkaRebalanceAssemblyOperatorTest {
                 return Future.failedFuture(e);
             }
         });
-
-        ResourceOperatorSupplier supplier = ResourceUtils.supplierWithMocks(true);
-        ConfigMapOperator mockCmOps = supplier.configMapOperations;
-
         when(mockCmOps.reconcile(CLUSTER_NAMESPACE, RESOURCE_NAME, map)).thenAnswer(invocation -> {
             try {
                 return Future.succeededFuture(Crds.kafkaRebalanceOperation(client)
