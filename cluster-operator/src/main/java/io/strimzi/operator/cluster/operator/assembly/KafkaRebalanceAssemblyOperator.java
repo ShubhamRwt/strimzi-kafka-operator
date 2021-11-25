@@ -13,13 +13,10 @@ import io.fabric8.kubernetes.client.KubernetesClientException;
 import io.fabric8.kubernetes.client.Watcher;
 import io.fabric8.kubernetes.client.WatcherException;
 import io.fabric8.kubernetes.client.dsl.Resource;
+import io.strimzi.api.kafka.Crds;
 import io.strimzi.api.kafka.KafkaRebalanceList;
 import io.strimzi.api.kafka.KafkaList;
-import io.strimzi.api.kafka.model.CruiseControlResources;
-import io.strimzi.api.kafka.model.Kafka;
-import io.strimzi.api.kafka.model.KafkaRebalance;
-import io.strimzi.api.kafka.model.KafkaRebalanceBuilder;
-import io.strimzi.api.kafka.model.KafkaRebalanceSpec;
+import io.strimzi.api.kafka.model.*;
 import io.strimzi.api.kafka.model.status.Condition;
 import io.strimzi.api.kafka.model.status.KafkaRebalanceStatus;
 import io.strimzi.api.kafka.model.status.KafkaRebalanceStatusBuilder;
@@ -59,6 +56,8 @@ import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -388,18 +387,21 @@ public class KafkaRebalanceAssemblyOperator
                                                         ANNO_STRIMZI_IO_REBALANCE,
                                                         rawRebalanceAnnotation(updatedKafkaRebalance));
                                                 if (hasRebalanceAnnotation(updatedKafkaRebalance)) {
-                                                    LOGGER.debugCr(reconciliation, "Removing annotation {}={}",
-                                                            ANNO_STRIMZI_IO_REBALANCE,
-                                                            rawRebalanceAnnotation(updatedKafkaRebalance));
-                                                    // Updated KafkaRebalance has rebalance annotation removed as
-                                                    // action specified by user has been completed.
-                                                    KafkaRebalance patchedKafkaRebalance = new KafkaRebalanceBuilder(updatedKafkaRebalance)
-                                                            .editMetadata()
+                                                    if (rebalanceAnnotation.equals(KafkaRebalanceAnnotation.unknown)) {
+                                                        return kafkaRebalanceOperator.patchAsync(reconciliation, updatedKafkaRebalance);
+                                                    } else {
+                                                        LOGGER.debugCr(reconciliation, "Removing annotation {}={}",
+                                                                ANNO_STRIMZI_IO_REBALANCE,
+                                                                rawRebalanceAnnotation(updatedKafkaRebalance));
+                                                        // Updated KafkaRebalance has rebalance annotation removed as
+                                                        // action specified by user has been completed.
+                                                        KafkaRebalance patchedKafkaRebalance = new KafkaRebalanceBuilder(updatedKafkaRebalance)
+                                                                .editMetadata()
                                                                 .removeFromAnnotations(ANNO_STRIMZI_IO_REBALANCE)
-                                                            .endMetadata()
-                                                            .build();
-
-                                                    return kafkaRebalanceOperator.patchAsync(reconciliation, patchedKafkaRebalance);
+                                                                .endMetadata()
+                                                                .build();
+                                                        return kafkaRebalanceOperator.patchAsync(reconciliation, patchedKafkaRebalance);
+                                                    }
                                                 } else {
                                                     LOGGER.debugCr(reconciliation, "No annotation {}", ANNO_STRIMZI_IO_REBALANCE);
                                                     return Future.succeededFuture();
@@ -456,7 +458,6 @@ public class KafkaRebalanceAssemblyOperator
         conditions.addAll(validation);
         Condition currentState = rebalanceStateCondition(currentStatus);
         conditions.add(currentState);
-
         return new KafkaRebalanceStatusBuilder()
                 .withSessionId(currentStatus.getSessionId())
                 .withOptimizationResult(currentStatus.getOptimizationResult())
@@ -837,7 +838,9 @@ public class KafkaRebalanceAssemblyOperator
                 return requestRebalance(reconciliation, host, apiClient, kafkaRebalance, true, rebalanceOptionsBuilder);
             default:
                 LOGGER.warnCr(reconciliation, "Ignore annotation {}={}", ANNO_STRIMZI_IO_REBALANCE, rebalanceAnnotation);
-                return Future.succeededFuture(new MapAndStatus<>(null, buildRebalanceStatusFromPreviousStatus(kafkaRebalance.getStatus(), validate(reconciliation, kafkaRebalance))));
+                Set<Condition> conditions = validate(reconciliation, kafkaRebalance);
+                conditions.add(StatusUtils.buildWarningCondition("Unsupported/Unknown annotation value", "The rebalance resource supports the following annotations : none, approve, refresh, stop."));
+                return Future.succeededFuture(new MapAndStatus<>(null, buildRebalanceStatusFromPreviousStatus(kafkaRebalance.getStatus(), conditions)));
         }
     }
 
@@ -1180,7 +1183,8 @@ public class KafkaRebalanceAssemblyOperator
                     KafkaRebalanceAnnotation.none : KafkaRebalanceAnnotation.valueOf(rebalanceAnnotationValue);
         } catch (IllegalArgumentException e) {
             rebalanceAnnotation = KafkaRebalanceAnnotation.unknown;
-            LOGGER.warnCr(reconciliation, "Wrong annotation value {}={} on {}/{}",
+            System.out.println("hello");
+            LOGGER.warnCr(reconciliation, "Wrong annotation value {}={} on {}/{}. The rebalance resource supports the following annotations : none, approve, refresh, stop.",
                     ANNO_STRIMZI_IO_REBALANCE, rebalanceAnnotationValue,
                     kafkaRebalance.getMetadata().getNamespace(), kafkaRebalance.getMetadata().getName());
         }
