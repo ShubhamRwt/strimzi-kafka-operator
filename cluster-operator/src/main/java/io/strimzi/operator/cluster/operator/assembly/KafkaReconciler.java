@@ -76,7 +76,10 @@ import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.ListTopicsOptions;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.TopicPartitionInfo;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -86,6 +89,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -483,6 +487,67 @@ public class KafkaReconciler {
         ).map((Void) null);
     }
 
+    protected Future<Set<String>> topicNames(Admin ac) {
+
+        Promise<Set<String>> namesPromise = Promise.promise();
+        ac.listTopics(new ListTopicsOptions().listInternal(true)).names()
+                .whenComplete((names, error) -> {
+                    if (error != null) {
+                        namesPromise.fail(error);
+                    } else {
+                        LOGGER.debugCr(reconciliation, "Got {} topic names", names.size());
+                        namesPromise.complete(names);
+                    }
+                });
+        return namesPromise.future();
+    }
+
+    protected Future<Collection<TopicDescription>> describeTopics(Admin ac, Set<String> names) {
+        Promise<Collection<TopicDescription>> descPromise = Promise.promise();
+        ac.describeTopics(names).allTopicNames()
+                .whenComplete((tds, error) -> {
+                    if (error != null) {
+                        descPromise.fail(error);
+                    } else {
+                        LOGGER.debugCr(reconciliation, "Got topic descriptions for {} topics", tds.size());
+                        descPromise.complete(tds.values());
+                    }
+                });
+        return descPromise.future();
+    }
+
+    private Boolean groupTopicsByBroker(Collection<TopicDescription> tds, int podId) {
+        for (TopicDescription td : tds) {
+            LOGGER.traceCr(reconciliation, td);
+            for (TopicPartitionInfo pd : td.partitions()) {
+                for (org.apache.kafka.common.Node broker : pd.replicas()) {
+                    if (podId == broker.id()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean contains(List<TopicPartitionInfo> td, int broker) {
+
+        for (TopicPartitionInfo pi : td) {
+            List<org.apache.kafka.common.Node> replicas = pi.replicas();
+            if (containsReplicas(replicas, broker)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsReplicas(List<org.apache.kafka.common.Node> replicas, int broker) {
+
+        return replicas.stream().anyMatch(node -> node.id() == broker);
+    }
+
+
+
     /**
      * Scales down the Kafka cluster if needed. Kafka scale-down is done in one go.
      *
@@ -493,6 +558,60 @@ public class KafkaReconciler {
                 && currentReplicas > kafka.getReplicas()) {
             // The previous (current) number of replicas is bigger than desired => we should scale-down
             LOGGER.infoCr(reconciliation, "Scaling Kafka down from {} to {} replicas", currentReplicas, kafka.getReplicas());
+
+            for (int i = currentReplicas; i > kafka.getReplicas(); i--) {
+                int podId = i - 1;
+                ReconcilerUtils.clientSecrets(reconciliation, secretOperator)
+                        .compose(compositeFuture -> {
+                            LOGGER.debugCr(reconciliation, "Attempt to get clusterId");
+                            Promise<Void> resultPromise = Promise.promise();
+                            vertx.createSharedWorkerExecutor("kubernetes-ops-pool").executeBlocking(
+                                    future -> {
+                                        Admin kafkaAdmin = null;
+                                        try {
+                                            String bootstrapHostname = KafkaResources.bootstrapServiceName(reconciliation.name()) + "." + reconciliation.namespace() + ".svc:" + KafkaCluster.REPLICATION_PORT;
+                                            LOGGER.debugCr(reconciliation, "Creating AdminClient for clusterId using {}", bootstrapHostname);
+                                            kafkaAdmin = adminClientProvider.createAdminClient(bootstrapHostname, compositeFuture.resultAt(0), compositeFuture.resultAt(1), "cluster-operator");
+
+
+                                            Future<Set<String>> topicNames = topicNames(kafkaAdmin);
+                                            Admin kafkaAdmin1 = kafkaAdmin;
+                                            Future<Collection<TopicDescription>> descriptions = topicNames.compose(names -> {
+                                                LOGGER.debugCr(reconciliation, "Got {} topic names", names.size());
+                                                LOGGER.traceCr(reconciliation, "Topic names {}", names);
+                                                return describeTopics(kafkaAdmin1, names);
+                                            });
+
+                                            Future<Boolean> topicsOnGivenBroker = descriptions
+                                                    .compose(topicDescriptions -> {
+                                                        LOGGER.debugCr(reconciliation, "Got {} topic descriptions", topicDescriptions.size());
+                                                        return Future.succeededFuture(groupTopicsByBroker(topicDescriptions, podId));
+                                                    }).recover(error -> {
+                                                        LOGGER.warnCr(reconciliation, "failed to get topic descriptions", error);
+                                                        return Future.failedFuture(error);
+                                                    });
+
+                                            if (topicsOnGivenBroker.result()) {
+                                                throw new Exception("Can't scale down brokers");
+                                            }
+
+                                        } catch (KafkaException e) {
+                                            LOGGER.warnCr(reconciliation, "Kafka exception getting clusterId {}", e.getMessage());
+                                        } catch (Exception e) {
+                                            e.printStackTrace();
+                                        } finally {
+                                            if (kafkaAdmin != null) {
+                                                kafkaAdmin.close();
+                                            }
+                                        }
+
+                                        future.complete();
+                                    },
+                                    true,
+                                    resultPromise);
+                            return resultPromise.future();
+                        });
+            }
 
             if (featureGates.useStrimziPodSetsEnabled())   {
                 Set<String> desiredPodNames = new HashSet<>(kafka.getReplicas());
@@ -1136,6 +1255,7 @@ public class KafkaReconciler {
                                     String bootstrapHostname = KafkaResources.bootstrapServiceName(reconciliation.name()) + "." + reconciliation.namespace() + ".svc:" + KafkaCluster.REPLICATION_PORT;
                                     LOGGER.debugCr(reconciliation, "Creating AdminClient for clusterId using {}", bootstrapHostname);
                                     kafkaAdmin = adminClientProvider.createAdminClient(bootstrapHostname, compositeFuture.resultAt(0), compositeFuture.resultAt(1), "cluster-operator");
+
                                     kafkaStatus.setClusterId(kafkaAdmin.describeCluster().clusterId().get());
                                 } catch (KafkaException e) {
                                     LOGGER.warnCr(reconciliation, "Kafka exception getting clusterId {}", e.getMessage());
