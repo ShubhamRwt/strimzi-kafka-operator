@@ -1824,7 +1824,6 @@ public class KafkaRebalanceAssemblyOperatorTest {
         context.verify(() -> {
             KafkaRebalance kafkaRebalance = Crds.kafkaRebalanceOperation(kubernetesClient).inNamespace(namespace).withName(resource).get();
             assertThat(kafkaRebalance, StateMatchers.hasState());
-            System.out.println(kafkaRebalance.getStatus().getConditions().get(0).getType());
             assertThat(reason, is(kafkaRebalance.getStatus().getConditions().get(1).getReason()));
         });
     }
