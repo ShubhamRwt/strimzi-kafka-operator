@@ -294,6 +294,7 @@ public class KafkaReconciler {
      */
     protected Future<Void> networkPolicy() {
         if (isNetworkPolicyGeneration) {
+            System.out.println("ji");
             return networkPolicyOperator.reconcile(reconciliation, reconciliation.namespace(), KafkaResources.kafkaNetworkPolicyName(reconciliation.name()), kafka.generateNetworkPolicy(operatorNamespace, operatorNamespaceLabels))
                     .map((Void) null);
         } else {
