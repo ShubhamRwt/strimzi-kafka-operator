@@ -348,7 +348,7 @@ public class RackRollingTest {
     }
 
     @Test
-    public void shouldRestartBrokerWithChangedReconfigurableLoggingParameter() throws ExecutionException, InterruptedException, TimeoutException {
+    public void shouldReconfigureBrokerWithChangedReconfigurableLoggingParameter() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
         var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
@@ -444,6 +444,7 @@ public class RackRollingTest {
                 3,
                 5);
 
+        // then
         for (var nodeRef: nodeRefs) {
             Mockito.verify(client, never()).reconfigureServer(eq(nodeRef), any(), any());
             Mockito.verify(client, never()).deletePod(any());
