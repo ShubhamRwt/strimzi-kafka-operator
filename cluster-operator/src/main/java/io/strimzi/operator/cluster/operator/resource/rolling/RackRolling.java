@@ -10,6 +10,7 @@ import io.strimzi.operator.cluster.model.RestartReason;
 import io.strimzi.operator.cluster.model.RestartReasons;
 import io.strimzi.operator.cluster.operator.resource.KafkaBrokerConfigurationDiff;
 import io.strimzi.operator.cluster.operator.resource.KafkaBrokerLoggingConfigurationDiff;
+import io.strimzi.operator.common.MaxAttemptsExceededException;
 import io.strimzi.operator.common.Reconciliation;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.admin.TopicListing;
@@ -312,8 +313,8 @@ class RackRolling {
     }
 
     private static void restartServer(RollClient rollClient, Context context, int maxRestarts) {
-        if (context.numRestarts() > maxRestarts) {
-            throw new RuntimeException("Too many restarts"); // TODO proper exception type
+        if (context.numRestarts() >= maxRestarts) {
+            throw new MaxRestartsExceededException("Max restart limit reached");
         }
         rollClient.deletePod(context.nodeRef());
         context.transitionTo(State.RESTARTED);

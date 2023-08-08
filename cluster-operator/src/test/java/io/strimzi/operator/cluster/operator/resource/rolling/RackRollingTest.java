@@ -30,6 +30,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
@@ -53,8 +57,37 @@ public class RackRollingTest {
         return RestartReasons.of(RestartReason.MANUAL_ROLLING_UPDATE);
     }
 
+    private static RestartReasons podUnresponsive(int serverId) {
+        return RestartReasons.of(RestartReason.POD_UNRESPONSIVE);
+    }
+
     private static RestartReasons configChange(int serverId) {
         return RestartReasons.of(RestartReason.CONFIG_CHANGE_REQUIRES_RESTART);
+    }
+
+    private static List<NodeRef> listOfMultipleBrokerNodes(){
+        return List.of(
+                new NodeRef("pool-kafka-0", 0, "pool", false, false),
+                new NodeRef("pool-kafka-1", 1, "pool", false, false),
+                new NodeRef("pool-kafka-2", 2, "pool", false, false));
+    }
+
+    public void doRollingRestart(RollClient client, List<NodeRef> nodeRefList, Function<Integer, RestartReasons>reason, Function<Integer, String> kafkaConfigProvider,
+                                 Integer maxRestartsBatchSize, Integer maxRestarts) throws ExecutionException, InterruptedException, TimeoutException {
+
+        RackRolling.rollingRestart(time,
+                client,
+                nodeRefList,
+                reason,
+                Reconciliation.DUMMY_RECONCILIATION,
+                KafkaVersionTestUtils.getLatestVersion(),
+                kafkaConfigProvider,
+                null,
+                30_000,
+                120_000,
+                maxRestartsBatchSize,
+                maxRestarts);
+
     }
 
     @Test
@@ -66,18 +99,7 @@ public class RackRollingTest {
         mockHealthyBroker(client, nodeRef);
 
         // when
-        RackRolling.rollingRestart(time,
-                client,
-                List.of(nodeRef),
-                RackRollingTest::noReasons,
-                Reconciliation.DUMMY_RECONCILIATION,
-                KafkaVersionTestUtils.getLatestVersion(),
-                EMPTY_CONFIG_SUPPLIER,
-                null,
-                30_000,
-                120_000,
-                1,
-                1);
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::noReasons, EMPTY_CONFIG_SUPPLIER, 1 ,1);
 
         // then
         Mockito.verify(client, never()).reconfigureServer(any(), any(), any());
@@ -90,6 +112,18 @@ public class RackRollingTest {
                 .when(client)
                 .isNotReady(nodeRef);
         doReturn(BrokerState.RUNNING)
+                .when(client)
+                .getBrokerState(nodeRef);
+        doCallRealMethod()
+                .when(client)
+                .observe(nodeRef);
+    }
+
+    private static void mockUnHealthyBroker(RollClient client, NodeRef nodeRef) {
+        doReturn(true, false)
+                .when(client)
+                .isNotReady(nodeRef);
+        doReturn(BrokerState.NOT_RUNNING, BrokerState.RUNNING)
                 .when(client)
                 .getBrokerState(nodeRef);
         doCallRealMethod()
@@ -142,18 +176,7 @@ public class RackRollingTest {
                 .describeBrokerConfigs(List.of(nodeRef));
 
         // when
-        RackRolling.rollingRestart(time,
-                client,
-                List.of(nodeRef),
-                RackRollingTest::manualRolling,
-                Reconciliation.DUMMY_RECONCILIATION,
-                KafkaVersionTestUtils.getLatestVersion(),
-                EMPTY_CONFIG_SUPPLIER,
-                null,
-                30_000,
-                120_000,
-                1,
-                1);
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::manualRolling, EMPTY_CONFIG_SUPPLIER, 1, 1);
 
         // then
         Mockito.verify(client, never()).reconfigureServer(any(), any(), any());
@@ -180,23 +203,112 @@ public class RackRollingTest {
                 .tryElectAllPreferredLeaders(nodeRef);
 
         // when
-        RackRolling.rollingRestart(time,
-                client,
-                List.of(nodeRef),
-                RackRollingTest::manualRolling,
-                Reconciliation.DUMMY_RECONCILIATION,
-                KafkaVersionTestUtils.getLatestVersion(),
-                EMPTY_CONFIG_SUPPLIER,
-                null,
-                30_000,
-                120_000,
-                1,
-                1);
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::manualRolling, EMPTY_CONFIG_SUPPLIER, 1, 1);
 
         // then
         Mockito.verify(client, never()).reconfigureServer(any(), any(), any());
         Mockito.verify(client, times(1)).deletePod(eq(nodeRef));
         Mockito.verify(client, times(1)).tryElectAllPreferredLeaders(eq(nodeRef));
+    }
+
+    @Test
+    void brokerRestartsGreaterThanMaxRestarts() throws ExecutionException, InterruptedException, TimeoutException {
+
+        // given
+        var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
+        Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
+
+        RollClient client = mock(RollClient.class);
+        mockUnHealthyBroker(client, nodeRef);
+        addTopic("topic-A", node);
+        mockTopics(client);
+        doReturn(Map.of(0, new RollClient.Configs(new Config(Set.of()), new Config(Set.of()))))
+                .when(client)
+                .describeBrokerConfigs(List.of(nodeRef));
+        doReturn(0)
+                .when(client)
+                .tryElectAllPreferredLeaders(nodeRef);
+
+        try {
+            // when
+            doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 1);
+            fail("Should throw");
+        }
+        catch (MaxRestartsExceededException e) {
+            assertThat(e.getMessage(), is("Max restart limit reached"));
+        }
+    }
+
+    @Test
+    void testTimeoutExceptionIfLeaderNotElected() throws ExecutionException, InterruptedException, TimeoutException {
+
+        // given
+        var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
+        Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
+
+        RollClient client = mock(RollClient.class);
+        mockUnHealthyBroker(client, nodeRef);
+        addTopic("topic-A", node);
+        mockTopics(client);
+        doReturn(Map.of(0, new RollClient.Configs(new Config(Set.of()), new Config(Set.of()))))
+                .when(client)
+                .describeBrokerConfigs(List.of(nodeRef));
+        doReturn(2)
+                .when(client)
+                .tryElectAllPreferredLeaders(nodeRef);
+
+      assertThrows(TimeoutException.class, ()->
+            doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2));
+
+    }
+
+    @Test
+    void testRepeatsLeaderElectionCallsUntilLeaderElected() throws ExecutionException, InterruptedException, TimeoutException {
+
+        // given
+        var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
+        Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
+
+        RollClient client = mock(RollClient.class);
+        mockHealthyBroker(client, nodeRef);
+        addTopic("topic-A", node);
+        mockTopics(client);
+        doReturn(Map.of(0, new RollClient.Configs(new Config(Set.of()), new Config(Set.of()))))
+                .when(client)
+                .describeBrokerConfigs(List.of(nodeRef));
+        doReturn(1, 1, 1 ,1, 0)
+                .when(client)
+                .tryElectAllPreferredLeaders(nodeRef);
+
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2);
+
+        Mockito.verify(client, never()).reconfigureServer(any(), any(), any());
+        Mockito.verify(client, times(1)).deletePod(eq(nodeRef));
+        Mockito.verify(client, times(5)).tryElectAllPreferredLeaders(eq(nodeRef));
+    }
+
+    @Test
+    void testTimeoutExceptionIfPodNotAbletoRecoverAfterRestart() throws ExecutionException, InterruptedException, TimeoutException {
+
+        // given
+        var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
+        Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
+
+        RollClient client = mock(RollClient.class);
+        addTopic("topic-A", node);
+        mockTopics(client);
+        doReturn(false)
+                .when(client)
+                .isNotReady(nodeRef);
+        doReturn(BrokerState.RUNNING, BrokerState.NOT_RUNNING)
+                .when(client)
+                .getBrokerState(nodeRef);
+        doCallRealMethod()
+                .when(client)
+                .observe(nodeRef);
+
+        assertThrows(TimeoutException.class, ()->
+                doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2));
     }
 
     @Test
@@ -226,18 +338,7 @@ public class RackRollingTest {
                 .tryElectAllPreferredLeaders(nodeRef);
 
         // when
-        RackRolling.rollingRestart(time,
-                client,
-                List.of(nodeRef),
-                RackRollingTest::noReasons,
-                Reconciliation.DUMMY_RECONCILIATION,
-                KafkaVersionTestUtils.getLatestVersion(),
-                EMPTY_CONFIG_SUPPLIER,
-                null,
-                30_000,
-                120_000,
-                1,
-                1);
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::noReasons, EMPTY_CONFIG_SUPPLIER, 1, 1);
 
         // then
         Mockito.verify(client, never()).reconfigureServer(any(), any(), any());
@@ -277,18 +378,7 @@ public class RackRollingTest {
                 .observe(nodeRef);
 
         // when
-        RackRolling.rollingRestart(time,
-                client,
-                List.of(nodeRef),
-                RackRollingTest::configChange,
-                Reconciliation.DUMMY_RECONCILIATION,
-                KafkaVersionTestUtils.getLatestVersion(),
-                serverId -> "compression.type=snappy",
-                null,
-                30_000,
-                120_000,
-                1,
-                1);
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::configChange, serverId -> "compression.type=snappy", 1, 1);
 
         // then
         Mockito.verify(client, times(1)).reconfigureServer(eq(nodeRef),any(), any());
@@ -329,18 +419,7 @@ public class RackRollingTest {
                 .observe(nodeRef);
 
         // when
-        RackRolling.rollingRestart(time,
-                client,
-                List.of(nodeRef),
-                RackRollingTest::configChange,
-                Reconciliation.DUMMY_RECONCILIATION,
-                KafkaVersionTestUtils.getLatestVersion(),
-                serverId -> "auto.leader.rebalance.enable=false",
-                null,
-                30_000,
-                120_000,
-                1,
-                1);
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::configChange, serverId -> "auto.leader.rebalance.enable=false", 1, 1);
 
         // then
         Mockito.verify(client, never()).reconfigureServer(eq(nodeRef),any(), any());
@@ -379,18 +458,7 @@ public class RackRollingTest {
                 .observe(nodeRef);
 
         // when
-        RackRolling.rollingRestart(time,
-                client,
-                List.of(nodeRef),
-                RackRollingTest::configChange,
-                Reconciliation.DUMMY_RECONCILIATION,
-                KafkaVersionTestUtils.getLatestVersion(),
-                serverId -> "log.retention.ms=1000",
-                null,
-                30_000,
-                120_000,
-                1,
-                1);
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::configChange, serverId -> "log.retention.ms=1000", 1, 1);
 
         // then
         Mockito.verify(client, times(1)).reconfigureServer(eq(nodeRef),any(), any());
@@ -402,10 +470,7 @@ public class RackRollingTest {
     void shouldNotRestartBrokersIfHealthyAndNoReason() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
-        var nodeRefs = List.of(
-                new NodeRef("pool-kafka-0", 0, "pool", false, false),
-                new NodeRef("pool-kafka-1", 1, "pool", false, false),
-                new NodeRef("pool-kafka-2", 2, "pool", false, false));
+        var nodeRefs = listOfMultipleBrokerNodes();
         List<Node> nodeList = new ArrayList<>();
         for (var nodeRef: nodeRefs) {
             nodeList.add(new Node(nodeRef.nodeId(), Node.noNode().host(), Node.noNode().port()));
@@ -431,18 +496,7 @@ public class RackRollingTest {
                 .tryElectAllPreferredLeaders(nodeRefs.get(0));
 
         // when
-        RackRolling.rollingRestart(time,
-                client,
-                nodeRefs,
-                RackRollingTest::noReasons,
-                Reconciliation.DUMMY_RECONCILIATION,
-                KafkaVersionTestUtils.getLatestVersion(),
-                EMPTY_CONFIG_SUPPLIER,
-                null,
-                30_000,
-                120_000,
-                3,
-                5);
+        doRollingRestart(client, nodeRefs, RackRollingTest::noReasons, EMPTY_CONFIG_SUPPLIER, 3, 5);
 
         // then
         for (var nodeRef: nodeRefs) {
@@ -456,10 +510,7 @@ public class RackRollingTest {
     void shouldRestartBrokersIfReasonManualRolling() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
-        var nodeRefs = List.of(
-                new NodeRef("pool-kafka-0", 0, "pool", false, false),
-                new NodeRef("pool-kafka-1", 1, "pool", false, false),
-                new NodeRef("pool-kafka-2", 2, "pool", false, false));
+        var nodeRefs = listOfMultipleBrokerNodes();
         List<Node> nodeList = new ArrayList<>();
         for (var nodeRef: nodeRefs) {
             nodeList.add(new Node(nodeRef.nodeId(), Node.noNode().host(), Node.noNode().port()));
@@ -485,18 +536,7 @@ public class RackRollingTest {
                 .tryElectAllPreferredLeaders(nodeRefs.get(0));
 
         // when
-        RackRolling.rollingRestart(time,
-                client,
-                nodeRefs,
-                RackRollingTest::manualRolling,
-                Reconciliation.DUMMY_RECONCILIATION,
-                KafkaVersionTestUtils.getLatestVersion(),
-                EMPTY_CONFIG_SUPPLIER,
-                null,
-                30_000,
-                120_000,
-                3,
-                5);
+        doRollingRestart(client, nodeRefs, RackRollingTest::manualRolling, EMPTY_CONFIG_SUPPLIER, 3, 1);
 
         // then
         for (var nodeRef: nodeRefs) {
@@ -508,14 +548,13 @@ public class RackRollingTest {
 
     // TODO assertions that the active controller is last
     // TODO assertions that controllers are always in different batches
-    // TODO test that exceeding maxRestart results in exception
+    // TODO test that exceeding maxRestart results in exception :Done
     // TODO test that exceeding postReconfigureTimeoutMs results in exception
-    // TODO test that exceeding postRestartTimeoutMs results in exception in all the possible cases:
-    //    the broker state not becoming ready (and that we don't retry restarting in this case)
-    //    tryElectAllPreferredLeaders not returning 0
+    // TODO test that exceeding postRestartTimeoutMs results in exception in all the possible cases:Done
+    //    the broker state not becoming ready (and that we don't retry restarting in this case): Done
+    //    tryElectAllPreferredLeaders not returning 0    : Done
 
-    // TODO that we repeat calls to tryElectAllPreferredLeaders until the return value is 0
-
+    // TODO that we repeat calls to tryElectAllPreferredLeaders until the return value is 0 : Done
     // TODO Tests for combined-mode brokers
     // TODO Tests for pure controllers
     // TODO Tests for pure brokers
