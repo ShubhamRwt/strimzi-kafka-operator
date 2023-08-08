@@ -212,7 +212,7 @@ public class RackRollingTest {
     }
 
     @Test
-    void brokerRestartsGreaterThanMaxRestarts() throws ExecutionException, InterruptedException, TimeoutException {
+    void testExceptionIfBrokerRestartsMoreThanMaxRestarts() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
         var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
@@ -240,7 +240,7 @@ public class RackRollingTest {
     }
 
     @Test
-    void testTimeoutExceptionIfLeaderNotElected() throws ExecutionException, InterruptedException, TimeoutException {
+    void testPostRestartTimeoutExceptionIfAllPreferredLeaderNotElected() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
         var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
@@ -263,7 +263,7 @@ public class RackRollingTest {
     }
 
     @Test
-    void testRepeatsLeaderElectionCallsUntilLeaderElected() throws ExecutionException, InterruptedException, TimeoutException {
+    void testRepeatsAllPreferredLeaderElectionCallsUntilAllPreferredLeaderElected() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
         var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
@@ -288,7 +288,7 @@ public class RackRollingTest {
     }
 
     @Test
-    void testTimeoutExceptionIfPodNotAbletoRecoverAfterRestart() throws ExecutionException, InterruptedException, TimeoutException {
+    void testPostRestartTimeoutExceptionIfPodNotAbletoRecoverAfterRestart() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
         var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
@@ -309,6 +309,43 @@ public class RackRollingTest {
 
         assertThrows(TimeoutException.class, ()->
                 doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2));
+    }
+
+    @Test
+    void testPostReconfigureTimeoutExceptionIfAllPreferredLeadersNotElected() throws ExecutionException, InterruptedException, TimeoutException {
+
+        // given
+        var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
+        Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
+
+        RollClient client = mock(RollClient.class);
+        doReturn(false)
+                .when(client)
+                .isNotReady(nodeRef);
+        doReturn(BrokerState.RUNNING)
+                .when(client)
+                .getBrokerState(nodeRef);
+        doCallRealMethod()
+                .when(client)
+                .observe(nodeRef);
+        addTopic("topic-A", node);
+        mockTopics(client);
+        doReturn(Map.of(0, new RollClient.Configs(new Config(Set.of(
+                new ConfigEntry("compression.type", "zstd")
+        )), new Config(Set.of()))))
+                .when(client)
+                .describeBrokerConfigs(List.of(nodeRef));
+        doReturn(1)
+                .when(client)
+                .tryElectAllPreferredLeaders(nodeRef);
+        doReturn(State.SERVING)
+                .when(client)
+                .observe(nodeRef);
+
+        // when
+        assertThrows(TimeoutException.class, ()->
+                doRollingRestart(client, List.of(nodeRef), RackRollingTest::configChange, serverId -> "compression.type=snappy", 1, 1));
+
     }
 
     @Test
@@ -548,13 +585,6 @@ public class RackRollingTest {
 
     // TODO assertions that the active controller is last
     // TODO assertions that controllers are always in different batches
-    // TODO test that exceeding maxRestart results in exception :Done
-    // TODO test that exceeding postReconfigureTimeoutMs results in exception
-    // TODO test that exceeding postRestartTimeoutMs results in exception in all the possible cases:Done
-    //    the broker state not becoming ready (and that we don't retry restarting in this case): Done
-    //    tryElectAllPreferredLeaders not returning 0    : Done
-
-    // TODO that we repeat calls to tryElectAllPreferredLeaders until the return value is 0 : Done
     // TODO Tests for combined-mode brokers
     // TODO Tests for pure controllers
     // TODO Tests for pure brokers
