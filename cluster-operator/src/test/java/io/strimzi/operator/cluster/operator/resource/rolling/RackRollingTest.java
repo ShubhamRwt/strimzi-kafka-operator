@@ -30,10 +30,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
@@ -47,7 +46,7 @@ public class RackRollingTest {
 
     static final Function<Integer, String> EMPTY_CONFIG_SUPPLIER = serverId -> "";
 
-    private final Time time = new Time.TestTime();
+    private final Time time = new Time.TestTime(1_000_000_000L);
 
     static RestartReasons noReasons(int serverId) {
         return RestartReasons.empty();
@@ -65,15 +64,19 @@ public class RackRollingTest {
         return RestartReasons.of(RestartReason.CONFIG_CHANGE_REQUIRES_RESTART);
     }
 
-    private static List<NodeRef> listOfMultipleBrokerNodes(){
+    private static List<NodeRef> listOfMultipleBrokerNodes() {
         return List.of(
                 new NodeRef("pool-kafka-0", 0, "pool", false, false),
                 new NodeRef("pool-kafka-1", 1, "pool", false, false),
                 new NodeRef("pool-kafka-2", 2, "pool", false, false));
     }
 
-    public void doRollingRestart(RollClient client, List<NodeRef> nodeRefList, Function<Integer, RestartReasons>reason, Function<Integer, String> kafkaConfigProvider,
-                                 Integer maxRestartsBatchSize, Integer maxRestarts) throws ExecutionException, InterruptedException, TimeoutException {
+    public void doRollingRestart(RollClient client,
+                                 List<NodeRef> nodeRefList,
+                                 Function<Integer, RestartReasons> reason,
+                                 Function<Integer, String> kafkaConfigProvider,
+                                 Integer maxRestartsBatchSize,
+                                 Integer maxRestarts) throws ExecutionException, InterruptedException, TimeoutException {
 
         RackRolling.rollingRestart(time,
                 client,
@@ -99,7 +102,7 @@ public class RackRollingTest {
         mockHealthyBroker(client, nodeRef);
 
         // when
-        doRollingRestart(client, List.of(nodeRef), RackRollingTest::noReasons, EMPTY_CONFIG_SUPPLIER, 1 ,1);
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::noReasons, EMPTY_CONFIG_SUPPLIER, 1, 1);
 
         // then
         Mockito.verify(client, never()).reconfigureServer(any(), any(), any());
@@ -156,9 +159,9 @@ public class RackRollingTest {
                 .when(client)
                 .listTopics();
         doAnswer(i -> {
-                List<Uuid> topicIds = i.getArgument(0);
-                return topicIds.stream().map(tid -> topicDescriptions.get(tid)).toList();
-            })
+            List<Uuid> topicIds = i.getArgument(0);
+            return topicIds.stream().map(tid -> topicDescriptions.get(tid)).toList();
+        })
                 .when(client)
                 .describeTopics(any());
     }
@@ -212,7 +215,7 @@ public class RackRollingTest {
     }
 
     @Test
-    void testExceptionIfBrokerRestartsMoreThanMaxRestarts() throws ExecutionException, InterruptedException, TimeoutException {
+    void shouldThrowMaxRestartsExceededIfBrokerRestartsMoreThanMaxRestarts() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
         var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
@@ -229,18 +232,16 @@ public class RackRollingTest {
                 .when(client)
                 .tryElectAllPreferredLeaders(nodeRef);
 
-        try {
-            // when
-            doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 1);
-            fail("Should throw");
-        }
-        catch (MaxRestartsExceededException e) {
-            assertThat(e.getMessage(), is("Max restart limit reached"));
-        }
+        // when
+        var ex = assertThrows(MaxRestartsExceededException.class,
+                () -> doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 1));
+
+        //then
+        assertEquals("Broker 0 has been restarted 1 times", ex.getMessage());
     }
 
     @Test
-    void testPostRestartTimeoutExceptionIfAllPreferredLeaderNotElected() throws ExecutionException, InterruptedException, TimeoutException {
+    void shouldThrowTimeoutExceptionIfAllPreferredLeaderNotElected() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
         var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
@@ -257,62 +258,19 @@ public class RackRollingTest {
                 .when(client)
                 .tryElectAllPreferredLeaders(nodeRef);
 
-      assertThrows(TimeoutException.class, ()->
-            doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2));
+        var te = assertThrows(TimeoutException.class,
+              () -> doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2));
+
+        assertEquals("Failed to reach LEADING_ALL_PREFERRED within 117000: " +
+                        "Context[nodeRef=pool-kafka-0/0, state=SERVING, " +
+                        "lastTransition=1970-01-01T00:00:03Z, reason=[POD_UNRESPONSIVE], numRestarts=1]",
+                te.getMessage());
 
     }
 
-    @Test
-    void testRepeatsAllPreferredLeaderElectionCallsUntilAllPreferredLeaderElected() throws ExecutionException, InterruptedException, TimeoutException {
-
-        // given
-        var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
-        Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
-
-        RollClient client = mock(RollClient.class);
-        mockHealthyBroker(client, nodeRef);
-        addTopic("topic-A", node);
-        mockTopics(client);
-        doReturn(Map.of(0, new RollClient.Configs(new Config(Set.of()), new Config(Set.of()))))
-                .when(client)
-                .describeBrokerConfigs(List.of(nodeRef));
-        doReturn(1, 1, 1 ,1, 0)
-                .when(client)
-                .tryElectAllPreferredLeaders(nodeRef);
-
-        doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2);
-
-        Mockito.verify(client, never()).reconfigureServer(any(), any(), any());
-        Mockito.verify(client, times(1)).deletePod(eq(nodeRef));
-        Mockito.verify(client, times(5)).tryElectAllPreferredLeaders(eq(nodeRef));
-    }
 
     @Test
-    void testPostRestartTimeoutExceptionIfPodNotAbletoRecoverAfterRestart() throws ExecutionException, InterruptedException, TimeoutException {
-
-        // given
-        var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
-        Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
-
-        RollClient client = mock(RollClient.class);
-        addTopic("topic-A", node);
-        mockTopics(client);
-        doReturn(false)
-                .when(client)
-                .isNotReady(nodeRef);
-        doReturn(BrokerState.RUNNING, BrokerState.NOT_RUNNING)
-                .when(client)
-                .getBrokerState(nodeRef);
-        doCallRealMethod()
-                .when(client)
-                .observe(nodeRef);
-
-        assertThrows(TimeoutException.class, ()->
-                doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2));
-    }
-
-    @Test
-    void testPostReconfigureTimeoutExceptionIfAllPreferredLeadersNotElected() throws ExecutionException, InterruptedException, TimeoutException {
+    void shouldThrowTimeoutExceptionIfAllPreferredLeadersNotElected() throws ExecutionException, InterruptedException, TimeoutException {
 
         // given
         var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
@@ -343,9 +301,71 @@ public class RackRollingTest {
                 .observe(nodeRef);
 
         // when
-        assertThrows(TimeoutException.class, ()->
-                doRollingRestart(client, List.of(nodeRef), RackRollingTest::configChange, serverId -> "compression.type=snappy", 1, 1));
+        var te = assertThrows(TimeoutException.class,
+                () -> doRollingRestart(client, List.of(nodeRef), RackRollingTest::configChange, serverId -> "compression.type=snappy", 1, 1));
 
+        // then
+        assertEquals("Failed to reach LEADING_ALL_PREFERRED within 15000: " +
+                        "Context[nodeRef=pool-kafka-0/0, state=RECONFIGURED, " +
+                        "lastTransition=1970-01-01T00:00:00Z, " +
+                        "reason=[CONFIG_CHANGE_REQUIRES_RESTART], numRestarts=0]",
+                te.getMessage());
+
+    }
+
+
+    @Test
+    void shouldRepeatAllPreferredLeaderElectionCallsUntilAllPreferredLeaderElected() throws ExecutionException, InterruptedException, TimeoutException {
+
+        // given
+        var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
+        Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
+
+        RollClient client = mock(RollClient.class);
+        mockHealthyBroker(client, nodeRef);
+        addTopic("topic-A", node);
+        mockTopics(client);
+        doReturn(Map.of(0, new RollClient.Configs(new Config(Set.of()), new Config(Set.of()))))
+                .when(client)
+                .describeBrokerConfigs(List.of(nodeRef));
+        doReturn(1, 1, 1, 1, 0)
+                .when(client)
+                .tryElectAllPreferredLeaders(nodeRef);
+
+        doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2);
+
+        Mockito.verify(client, never()).reconfigureServer(any(), any(), any());
+        Mockito.verify(client, times(1)).deletePod(eq(nodeRef));
+        Mockito.verify(client, times(5)).tryElectAllPreferredLeaders(eq(nodeRef));
+    }
+
+    @Test
+    void shouldThrowTimeoutExceptionIfPodNotAbleToRecoverAfterRestart() throws ExecutionException, InterruptedException, TimeoutException {
+
+        // given
+        var nodeRef = new NodeRef("pool-kafka-0", 0, "pool", false, false);
+        Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
+
+        RollClient client = mock(RollClient.class);
+        addTopic("topic-A", node);
+        mockTopics(client);
+        doReturn(false)
+                .when(client)
+                .isNotReady(nodeRef);
+        doReturn(BrokerState.RUNNING, BrokerState.NOT_RUNNING)
+                .when(client)
+                .getBrokerState(nodeRef);
+        doCallRealMethod()
+                .when(client)
+                .observe(nodeRef);
+
+        var te = assertThrows(TimeoutException.class,
+                () -> doRollingRestart(client, List.of(nodeRef), RackRollingTest::podUnresponsive, EMPTY_CONFIG_SUPPLIER, 1, 2));
+
+        assertEquals("Failed to reach SERVING within 120000 ms: " +
+                        "Context[nodeRef=pool-kafka-0/0, state=RECOVERING, " +
+                        "lastTransition=1970-01-01T00:00:01Z, reason=[POD_UNRESPONSIVE], numRestarts=1]",
+                te.getMessage());
     }
 
     @Test
@@ -418,7 +438,7 @@ public class RackRollingTest {
         doRollingRestart(client, List.of(nodeRef), RackRollingTest::configChange, serverId -> "compression.type=snappy", 1, 1);
 
         // then
-        Mockito.verify(client, times(1)).reconfigureServer(eq(nodeRef),any(), any());
+        Mockito.verify(client, times(1)).reconfigureServer(eq(nodeRef), any(), any());
         Mockito.verify(client, never()).deletePod(eq(nodeRef));
         Mockito.verify(client, times(1)).tryElectAllPreferredLeaders(eq(nodeRef));
 
@@ -459,8 +479,8 @@ public class RackRollingTest {
         doRollingRestart(client, List.of(nodeRef), RackRollingTest::configChange, serverId -> "auto.leader.rebalance.enable=false", 1, 1);
 
         // then
-        Mockito.verify(client, never()).reconfigureServer(eq(nodeRef),any(), any());
-        Mockito.verify(client,times(1)).deletePod(eq(nodeRef));
+        Mockito.verify(client, never()).reconfigureServer(eq(nodeRef), any(), any());
+        Mockito.verify(client, times(1)).deletePod(eq(nodeRef));
         Mockito.verify(client, times(1)).tryElectAllPreferredLeaders(eq(nodeRef));
     }
 
@@ -498,7 +518,7 @@ public class RackRollingTest {
         doRollingRestart(client, List.of(nodeRef), RackRollingTest::configChange, serverId -> "log.retention.ms=1000", 1, 1);
 
         // then
-        Mockito.verify(client, times(1)).reconfigureServer(eq(nodeRef),any(), any());
+        Mockito.verify(client, times(1)).reconfigureServer(eq(nodeRef), any(), any());
         Mockito.verify(client, never()).deletePod(eq(nodeRef));
         Mockito.verify(client, times(1)).tryElectAllPreferredLeaders(eq(nodeRef));
     }
