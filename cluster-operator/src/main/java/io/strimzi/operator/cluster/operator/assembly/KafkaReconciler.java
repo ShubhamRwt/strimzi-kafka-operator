@@ -63,7 +63,7 @@ import io.strimzi.operator.common.Reconciliation;
 import io.strimzi.operator.common.ReconciliationLogger;
 import io.strimzi.operator.common.Util;
 import io.strimzi.operator.common.model.Labels;
-import io.strimzi.operator.common.InvalidConfigurationException
+import io.strimzi.operator.common.InvalidConfigurationException;
 import io.strimzi.operator.common.operator.resource.ClusterRoleBindingOperator;
 import io.strimzi.operator.common.operator.resource.ConfigMapOperator;
 import io.strimzi.operator.common.operator.resource.CrdOperator;
