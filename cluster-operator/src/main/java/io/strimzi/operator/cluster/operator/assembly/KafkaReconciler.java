@@ -262,14 +262,14 @@ public class KafkaReconciler {
                     if (Annotations.booleanAnnotation(kafkaCr, Annotations.ANNO_STRIMZI_IO_BYPASS_BROKER_SCALEDOWN_CHECK, false)) {
                         return Future.succeededFuture();
                     } else {
-                         return PreventBrokerScaleDownUtils.canScaleDownBrokers(vertx, reconciliation, kafka, secretOperator, adminClientProvider)
-                                 .compose(s -> {
-                                     if (!s.isEmpty()) {
-                                         throw new InvalidConfigurationException("Cannot scale down since broker contains partition replicas" + s);
-                                     } else {
-                                         return Future.succeededFuture();
-                                     }
-                                 });
+                        return PreventBrokerScaleDownUtils.canScaleDownBrokers(vertx, reconciliation, kafka, secretOperator, adminClientProvider)
+                                .compose(s -> {
+                                    if (!s.isEmpty()) {
+                                        throw new InvalidConfigurationException("Cannot scale down since broker contains partition replicas" + s);
+                                    } else {
+                                        return Future.succeededFuture();
+                                    }
+                                });
                     }})
                 .compose(i -> manualPodCleaning())
                 .compose(i -> networkPolicy())
