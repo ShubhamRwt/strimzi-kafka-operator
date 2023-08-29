@@ -368,6 +368,22 @@ public class KafkaCluster extends AbstractModel implements SupportsMetrics, Supp
     }
 
     /**
+     * Generates list of references to Kafka nodes going to be removed from the Kafka cluster. The references contain both the pod name and
+     * the ID of the Kafka node.
+     *
+     * @return  Set of Kafka node references which are going to be removed
+     */
+    public Set<Integer> removedNodes() {
+        Set<Integer> nodes = new LinkedHashSet<>();
+
+        for (KafkaPool pool : nodePools)    {
+            nodes.addAll(pool.idAssignment.toBeRemoved());
+        }
+
+        return nodes;
+    }
+
+    /**
      * Generates list of references to Kafka nodes for this Kafka cluster which have the broker role. The references
      * contain both the pod name and the ID of the Kafka node.
      *
@@ -381,7 +397,6 @@ public class KafkaCluster extends AbstractModel implements SupportsMetrics, Supp
                 brokers.addAll(pool.nodes());
             }
         }
-
         return brokers;
     }
 

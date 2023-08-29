@@ -84,6 +84,7 @@ import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.common.KafkaException;
+import io.strimzi.operator.common.InvalidConfigurationException;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -254,6 +255,14 @@ public class KafkaReconciler {
      */
     public Future<Void> reconcile(KafkaStatus kafkaStatus, Clock clock)    {
         return modelWarnings(kafkaStatus)
+                .compose(i -> PreventBrokerScaleDownUtils.canScaleDownBrokers(vertx, reconciliation, kafka, secretOperator, adminClientProvider)
+                        .compose(s -> {
+                            if (!s.isEmpty()) {
+                                throw new InvalidConfigurationException("Cannot scale down since these brokers contains partition replicas: " + s);
+                            } else {
+                                return Future.succeededFuture();
+                            }
+                        }))
                 .compose(i -> manualPodCleaning())
                 .compose(i -> networkPolicy())
                 .compose(i -> manualRollingUpdate())
