@@ -397,6 +397,7 @@ public class KafkaCluster extends AbstractModel implements SupportsMetrics, Supp
                 brokers.addAll(pool.nodes());
             }
         }
+
         return brokers;
     }
 
