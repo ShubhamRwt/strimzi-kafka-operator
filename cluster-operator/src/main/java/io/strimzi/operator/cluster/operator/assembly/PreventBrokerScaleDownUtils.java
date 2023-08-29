@@ -5,7 +5,6 @@
 package io.strimzi.operator.cluster.operator.assembly;
 
 import io.strimzi.api.kafka.model.KafkaResources;
-import io.strimzi.api.kafka.model.status.KafkaStatus;
 import io.strimzi.operator.cluster.model.KafkaCluster;
 import io.strimzi.operator.common.AdminClientProvider;
 import io.strimzi.operator.common.Reconciliation;
@@ -39,7 +38,6 @@ public class PreventBrokerScaleDownUtils {
      * @param vertx               Instance of vertx
      * @param reconciliation      Reconciliation marker
      * @param kafka               Kafka CR
-     * @param kafkaStatus         The Kafka Status class for adding conditions to it during the reconciliation
      * @param secretOperator      Secret operator for working with Secrets
      * @param adminClientProvider Used to create the Admin client instance
      * @return Future which completes when the check is complete
@@ -59,7 +57,6 @@ public class PreventBrokerScaleDownUtils {
      *
      * @param vertx                Instance of vertx
      * @param reconciliation       Reconciliation marker
-     * @param kafkaStatus          The Kafka Status class for adding conditions to it during the reconciliation
      * @param secretOperator       Secret operator for working with Secrets
      * @param adminClientProvider  Used to create the Admin client instance
      * @param idsToBeRemoved       Id to be removed
