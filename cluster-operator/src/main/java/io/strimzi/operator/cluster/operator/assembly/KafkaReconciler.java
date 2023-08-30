@@ -149,8 +149,6 @@ public class KafkaReconciler {
     private final AdminClientProvider adminClientProvider;
 
     private final Set<String> fsResizingRestartRequest = new HashSet<>();
-
-    private Kafka kafkaCr;
     private String logging = "";
     private String loggingHash = "";
     private final Map<Integer, String> brokerConfigurationHash = new HashMap<>();
@@ -193,7 +191,6 @@ public class KafkaReconciler {
     ) {
         this.reconciliation = reconciliation;
         this.vertx = vertx;
-        this.kafkaCr = kafkaCr;
         this.operationTimeoutMs = config.getOperationTimeoutMs();
         this.kafkaNodePoolCrs = nodePools;
 
