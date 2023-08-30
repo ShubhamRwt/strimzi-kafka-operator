@@ -371,13 +371,13 @@ public class KafkaCluster extends AbstractModel implements SupportsMetrics, Supp
      * Generates list of references to Kafka nodes going to be removed from the Kafka cluster. The references contain both the pod name and
      * the ID of the Kafka node.
      *
-     * @return  Set of Kafka node references which are going to be removed
+     * @return  Set of Kafka node ids which are going to be removed
      */
     public Set<Integer> removedNodes() {
         Set<Integer> nodes = new LinkedHashSet<>();
 
         for (KafkaPool pool : nodePools)    {
-            nodes.addAll(pool.idAssignment.toBeRemoved());
+            nodes.addAll(pool.scaledDownNodes());
         }
 
         return nodes;

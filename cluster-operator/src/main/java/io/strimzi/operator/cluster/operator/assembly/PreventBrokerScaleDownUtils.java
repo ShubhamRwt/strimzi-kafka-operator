@@ -19,10 +19,7 @@ import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartitionInfo;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Set;
-import java.util.HashSet;
+import java.util.*;
 
 /**
  * Class which contains several utility function which check if broker scale down can be done or not.
@@ -42,11 +39,11 @@ public class PreventBrokerScaleDownUtils {
      * @param adminClientProvider Used to create the Admin client instance
      * @return Future which completes when the check is complete
      */
-    public static Future<Set<Integer>> canScaleDownBrokers(Vertx vertx, Reconciliation reconciliation, KafkaCluster kafka,
+    public static Future<List<Integer>> canScaleDownBrokers(Vertx vertx, Reconciliation reconciliation, KafkaCluster kafka,
                                                    SecretOperator secretOperator, AdminClientProvider adminClientProvider) {
 
         if (kafka.removedNodes().isEmpty()) {
-            return Future.succeededFuture(Collections.emptySet());
+            return Future.succeededFuture(List.of());
         } else {
             return canScaleDownBrokerCheck(vertx, reconciliation, secretOperator, adminClientProvider, kafka.removedNodes());
         }
@@ -63,10 +60,10 @@ public class PreventBrokerScaleDownUtils {
 
      * @return  returns a boolean future based on the outcome of the check
      */
-    public static Future<Set<Integer>> canScaleDownBrokerCheck(Vertx vertx, Reconciliation reconciliation,
+    public static Future<List<Integer>> canScaleDownBrokerCheck(Vertx vertx, Reconciliation reconciliation,
                                                           SecretOperator secretOperator, AdminClientProvider adminClientProvider, Set<Integer> idsToBeRemoved) {
 
-        Promise<Set<Integer>> cannotScaleDown = Promise.promise();
+        Promise<List<Integer>> cannotScaleDown = Promise.promise();
         ReconcilerUtils.clientSecrets(reconciliation, secretOperator)
                 .compose(compositeFuture -> {
                     Promise<Void> resultPromise = Promise.promise();
@@ -87,7 +84,7 @@ public class PreventBrokerScaleDownUtils {
                                     descriptions
                                             .compose(topicDescriptions -> {
                                                 LOGGER.infoCr(reconciliation, "Got {} topic descriptions", topicDescriptions.size());
-                                                Set<Integer> idContainingPartitionReplicas = new HashSet<>();
+                                                List<Integer> idContainingPartitionReplicas = new ArrayList<>();
                                                 // Provides the node IDs which the user would like to remove first
                                                 for (Integer id: idsToBeRemoved)   {
                                                     brokerHasAnyReplicas(reconciliation, topicDescriptions, id, idContainingPartitionReplicas);
@@ -161,7 +158,7 @@ public class PreventBrokerScaleDownUtils {
      * @param tds                  Collection of Topic description
      * @return  Future which completes when the check is complete
      */
-    private static void  brokerHasAnyReplicas(Reconciliation reconciliation, Collection<TopicDescription> tds, int podId, Set<Integer> idsContainingParitionReplicas) {
+    private static void brokerHasAnyReplicas(Reconciliation reconciliation, Collection<TopicDescription> tds, int podId, List<Integer> idsContainingParitionReplicas) {
 
         for (TopicDescription td : tds) {
             LOGGER.traceCr(reconciliation, td);
