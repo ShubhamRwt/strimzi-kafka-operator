@@ -262,7 +262,7 @@ public class KafkaReconciler {
                     if (skipBrokerScaleDown) {
                         return Future.succeededFuture();
                     } else {
-                        return PreventBrokerScaleDownUtils.canScaleDownBrokers(vertx, reconciliation, kafka, secretOperator, adminClientProvider)
+                        return PreventBrokerScaleDownUtils.canScaleDownBrokers(vertx, reconciliation, kafka.removedNodes(), secretOperator, adminClientProvider)
                                 .compose(s -> {
                                     if (!s.isEmpty()) {
                                         throw new InvalidConfigurationException("Cannot scale down since broker contains partition replicas " + s);

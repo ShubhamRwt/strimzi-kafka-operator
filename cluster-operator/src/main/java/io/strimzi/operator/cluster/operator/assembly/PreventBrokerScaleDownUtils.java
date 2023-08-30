@@ -19,8 +19,9 @@ import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartitionInfo;
 
-import java.util.*;
-
+import java.util.Collection;
+import java.util.Set;
+import java.util.HashSet;
 /**
  * Class which contains several utility function which check if broker scale down can be done or not.
  */
@@ -34,18 +35,18 @@ public class PreventBrokerScaleDownUtils {
      *
      * @param vertx               Instance of vertx
      * @param reconciliation      Reconciliation marker
-     * @param kafka               Kafka CR
+     * @param removedNodes        Set of removed node from the cluster
      * @param secretOperator      Secret operator for working with Secrets
      * @param adminClientProvider Used to create the Admin client instance
      * @return Future which completes when the check is complete
      */
-    public static Future<List<Integer>> canScaleDownBrokers(Vertx vertx, Reconciliation reconciliation, KafkaCluster kafka,
+    public static Future<Set<Integer>> canScaleDownBrokers(Vertx vertx, Reconciliation reconciliation, Set<Integer> removedNodes,
                                                    SecretOperator secretOperator, AdminClientProvider adminClientProvider) {
 
-        if (kafka.removedNodes().isEmpty()) {
-            return Future.succeededFuture(List.of());
+        if (removedNodes.isEmpty()) {
+            return Future.succeededFuture(Set.of());
         } else {
-            return canScaleDownBrokerCheck(vertx, reconciliation, secretOperator, adminClientProvider, kafka.removedNodes());
+            return canScaleDownBrokerCheck(vertx, reconciliation, secretOperator, adminClientProvider, removedNodes);
         }
     }
 
@@ -56,14 +57,14 @@ public class PreventBrokerScaleDownUtils {
      * @param reconciliation       Reconciliation marker
      * @param secretOperator       Secret operator for working with Secrets
      * @param adminClientProvider  Used to create the Admin client instance
-     * @param idsToBeRemoved       Id to be removed
+     * @param idsToBeRemoved       Ids to be removed
 
      * @return  returns a boolean future based on the outcome of the check
      */
-    public static Future<List<Integer>> canScaleDownBrokerCheck(Vertx vertx, Reconciliation reconciliation,
+    public static Future<Set<Integer>> canScaleDownBrokerCheck(Vertx vertx, Reconciliation reconciliation,
                                                           SecretOperator secretOperator, AdminClientProvider adminClientProvider, Set<Integer> idsToBeRemoved) {
 
-        Promise<List<Integer>> cannotScaleDown = Promise.promise();
+        Promise<Set<Integer>> cannotScaleDown = Promise.promise();
         ReconcilerUtils.clientSecrets(reconciliation, secretOperator)
                 .compose(compositeFuture -> {
                     Promise<Void> resultPromise = Promise.promise();
@@ -84,7 +85,7 @@ public class PreventBrokerScaleDownUtils {
                                     descriptions
                                             .compose(topicDescriptions -> {
                                                 LOGGER.infoCr(reconciliation, "Got {} topic descriptions", topicDescriptions.size());
-                                                List<Integer> idContainingPartitionReplicas = new ArrayList<>();
+                                                Set<Integer> idContainingPartitionReplicas = new HashSet<>();
                                                 // Provides the node IDs which the user would like to remove first
                                                 for (Integer id: idsToBeRemoved)   {
                                                     brokerHasAnyReplicas(reconciliation, topicDescriptions, id, idContainingPartitionReplicas);
@@ -158,7 +159,7 @@ public class PreventBrokerScaleDownUtils {
      * @param tds                  Collection of Topic description
      * @return  Future which completes when the check is complete
      */
-    private static void brokerHasAnyReplicas(Reconciliation reconciliation, Collection<TopicDescription> tds, int podId, List<Integer> idsContainingParitionReplicas) {
+    private static void brokerHasAnyReplicas(Reconciliation reconciliation, Collection<TopicDescription> tds, int podId, Set<Integer> idsContainingParitionReplicas) {
 
         for (TopicDescription td : tds) {
             LOGGER.traceCr(reconciliation, td);
