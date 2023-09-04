@@ -155,9 +155,10 @@ public class PreventBrokerScaleDownUtils {
     /**
      * Checks if broker contains any partition replicas
      *
-     * @param reconciliation       Reconciliation marker
-     * @param tds                  Collection of Topic description
-     * @return  Future which completes when the check is complete
+     * @param reconciliation                 Reconciliation marker
+     * @param podId                          Id of broker
+     * @param tds                            Collection of Topic description
+     * @param idsContainingParitionReplicas  Set of broker ids containing partition replicas
      */
     private static void brokerHasAnyReplicas(Reconciliation reconciliation, Collection<TopicDescription> tds, int podId, Set<Integer> idsContainingParitionReplicas) {
 
