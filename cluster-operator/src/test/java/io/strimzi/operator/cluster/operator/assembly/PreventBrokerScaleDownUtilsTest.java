@@ -57,10 +57,7 @@ public class PreventBrokerScaleDownUtilsTest {
 
     private static final String NAMESPACE = "my-namespace";
     private static final String CLUSTER_NAME = "my-cluster";
-
     private static final Reconciliation RECONCILIATION = new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME);
-    private static WorkerExecutor sharedWorkerExecutor;
-
     private static Vertx vertx;
 
     // Injected by Fabric8 Mock Kubernetes Server
@@ -129,12 +126,12 @@ public class PreventBrokerScaleDownUtilsTest {
         when(mock.createAdminClient(anyString(), any(), any(), anyString())).thenReturn(admin);
 
         Node node = new Node(0, Node.noNode().host(), Node.noNode().port());
-        addTopic("topic-A", node);
-
-        mockDescribeTopics(admin);
+        addTopic("my-topic", node);
 
         ListTopicsResult ltr = mockListTopics();
         when(admin.listTopics(any())).thenReturn(ltr);
+
+        mockDescribeTopics(admin);
 
         KafkaCluster cluster = mock(KafkaCluster.class);
         doReturn(Set.of(2, 3)).when(cluster).removedNodes();
@@ -162,12 +159,12 @@ public class PreventBrokerScaleDownUtilsTest {
         when(mock.createAdminClient(anyString(), any(), any(), anyString())).thenReturn(admin);
 
         Node node = new Node(3, Node.noNode().host(), Node.noNode().port());
-        addTopic("topic-A", node);
-
-        mockDescribeTopics(admin);
+        addTopic("my-topic", node);
 
         ListTopicsResult ltr = mockListTopics();
         when(admin.listTopics(any())).thenReturn(ltr);
+
+        mockDescribeTopics(admin);
 
         KafkaCluster cluster = mock(KafkaCluster.class);
         doReturn(Set.of(2, 3)).when(cluster).removedNodes();
@@ -195,7 +192,7 @@ public class PreventBrokerScaleDownUtilsTest {
         when(mock.createAdminClient(anyString(), any(), any(), anyString())).thenReturn(admin);
 
         Node node = new Node(3, Node.noNode().host(), Node.noNode().port());
-        addTopic("topic-A", node);
+        addTopic("my-topic", node);
 
         mockDescribeTopics(admin);
 
@@ -220,7 +217,7 @@ public class PreventBrokerScaleDownUtilsTest {
         when(mock.createAdminClient(anyString(), any(), any(), anyString())).thenReturn(admin);
 
         Node node = new Node(3, Node.noNode().host(), Node.noNode().port());
-        addTopic("topic-A", node);
+        addTopic("my-topic", node);
 
         mockDescribeTopics(admin);
 
