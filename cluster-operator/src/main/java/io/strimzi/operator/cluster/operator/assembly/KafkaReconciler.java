@@ -32,9 +32,8 @@ import io.strimzi.api.kafka.model.status.UsedNodePoolStatusBuilder;
 import io.strimzi.api.kafka.model.storage.Storage;
 import io.strimzi.operator.cluster.PlatformFeaturesAvailability;
 import io.strimzi.operator.cluster.ClusterOperatorConfig;
-import io.strimzi.operator.common.model.Ca;
+import io.strimzi.operator.common.model.*;
 import io.strimzi.operator.cluster.model.CertUtils;
-import io.strimzi.operator.common.model.ClientsCa;
 import io.strimzi.operator.cluster.model.ClusterCa;
 import io.strimzi.operator.cluster.model.ImagePullPolicy;
 import io.strimzi.operator.cluster.model.KafkaCluster;
@@ -44,11 +43,9 @@ import io.strimzi.operator.cluster.model.KafkaVersionChange;
 import io.strimzi.operator.cluster.model.ListenersUtils;
 import io.strimzi.operator.cluster.model.ModelUtils;
 import io.strimzi.operator.cluster.model.NodeRef;
-import io.strimzi.operator.common.model.NodeUtils;
 import io.strimzi.operator.cluster.model.PodSetUtils;
 import io.strimzi.operator.cluster.model.RestartReason;
 import io.strimzi.operator.cluster.model.RestartReasons;
-import io.strimzi.operator.common.model.StatusDiff;
 import io.strimzi.operator.cluster.model.nodepools.NodePoolUtils;
 import io.strimzi.operator.cluster.operator.resource.ConcurrentDeletionException;
 import io.strimzi.operator.cluster.operator.resource.KafkaRoller;
@@ -62,7 +59,6 @@ import io.strimzi.operator.cluster.model.MetricsAndLogging;
 import io.strimzi.operator.common.Reconciliation;
 import io.strimzi.operator.common.ReconciliationLogger;
 import io.strimzi.operator.common.Util;
-import io.strimzi.operator.common.model.Labels;
 import io.strimzi.operator.common.InvalidConfigurationException;
 import io.strimzi.operator.common.operator.resource.ClusterRoleBindingOperator;
 import io.strimzi.operator.common.operator.resource.ConfigMapOperator;
@@ -134,6 +130,8 @@ public class KafkaReconciler {
     private final ServiceAccountOperator serviceAccountOperator;
     /* test */ final ServiceOperator serviceOperator;
     private final PvcOperator pvcOperator;
+
+    private final PreventBrokerScaleDownOperations brokerScaleDownOperations;
     private final StorageClassOperator storageClassOperator;
     private final ConfigMapOperator configMapOperator;
     private final NetworkPolicyOperator networkPolicyOperator;
@@ -147,7 +145,7 @@ public class KafkaReconciler {
 
     private final KubernetesRestartEventPublisher eventsPublisher;
 
-    private final AdminClientProvider adminClientProvider;
+    final AdminClientProvider adminClientProvider;
 
     private final Set<String> fsResizingRestartRequest = new HashSet<>();
     private String logging = "";
@@ -223,11 +221,12 @@ public class KafkaReconciler {
         this.pfa = pfa;
         this.imagePullPolicy = config.getImagePullPolicy();
         this.imagePullSecrets = config.getImagePullSecrets();
-        this.skipBrokerScaleDown = Annotations.booleanAnnotation(kafkaCr, ANNO_STRIMZI_IO_BYPASS_BROKER_SCALEDOWN_CHECK, false);
+        this.skipBrokerScaleDown = Annotations.booleanAnnotation(kafkaCr, ANNO_STRIMZI_IO_BYPASS_BROKER_SCALEDOWN_CHECK, true);
 
         this.stsOperator = supplier.stsOperations;
         this.strimziPodSetOperator = supplier.strimziPodSetOperator;
         this.secretOperator = supplier.secretOperations;
+        this.brokerScaleDownOperations = supplier.brokerScaleDownOperations;
         this.serviceAccountOperator = supplier.serviceAccountOperations;
         this.serviceOperator = supplier.serviceOperations;
         this.pvcOperator = supplier.pvcOperations;
@@ -258,20 +257,7 @@ public class KafkaReconciler {
      */
     public Future<Void> reconcile(KafkaStatus kafkaStatus, Clock clock)    {
         return modelWarnings(kafkaStatus)
-                .compose(i -> {
-                    if (skipBrokerScaleDown) {
-                        return Future.succeededFuture();
-                    } else {
-                        return PreventBrokerScaleDownUtils.canScaleDownBrokers(vertx, reconciliation, kafka.removedNodes(), secretOperator, adminClientProvider)
-                                .compose(s -> {
-                                    if (!s.isEmpty()) {
-                                        throw new InvalidConfigurationException("Cannot scale down since broker contains partition replicas " + s);
-                                    } else {
-                                        return Future.succeededFuture();
-                                    }
-                                });
-                    }
-                })
+                .compose(i -> brokerScaleDownCheck(skipBrokerScaleDown))
                 .compose(i -> manualPodCleaning())
                 .compose(i -> networkPolicy())
                 .compose(i -> manualRollingUpdate())
@@ -297,6 +283,21 @@ public class KafkaReconciler {
                 // This has to run after all possible rolling updates which might move the pods to different nodes
                 .compose(i -> nodePortExternalListenerStatus())
                 .compose(i -> addListenersToKafkaStatus(kafkaStatus));
+    }
+
+    protected Future<Set<Integer>> brokerScaleDownCheck(boolean skipBrokerScaleDown) {
+        if (skipBrokerScaleDown) {
+            return Future.succeededFuture();
+        } else {
+            return brokerScaleDownOperations.canScaleDownBrokers(vertx, reconciliation, kafka.removedNodes(), secretOperator, adminClientProvider)
+                    .compose(s -> {
+                        if (!s.isEmpty()) {
+                            throw new InvalidResourceException("Cannot scale down brokers " + kafka.removedNodes() + " because brokers " + s + " are not empty");
+                        } else {
+                            return Future.succeededFuture();
+                        }
+                    });
+        }
     }
 
     /**

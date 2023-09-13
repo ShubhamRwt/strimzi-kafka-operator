@@ -52,7 +52,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(VertxExtension.class)
-public class PreventBrokerScaleDownUtilsTest {
+public class PreventBrokerScaleDownOperationsTest {
 
     private static final String NAMESPACE = "my-namespace";
     private static final String CLUSTER_NAME = "my-cluster";
@@ -141,7 +141,9 @@ public class PreventBrokerScaleDownUtilsTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
-        PreventBrokerScaleDownUtils.canScaleDownBrokers(vertx, RECONCILIATION, cluster.removedNodes(), mockSecretOps, mock)
+        PreventBrokerScaleDownOperations operations = new PreventBrokerScaleDownOperations();
+
+        operations.canScaleDownBrokers(vertx, RECONCILIATION, cluster.removedNodes(), mockSecretOps, mock)
                 .onComplete(context.succeeding(s -> {
                     // the resource moved from ProposalPending to Stopped
                     assertThat(s.isEmpty(), is(true));
@@ -174,7 +176,9 @@ public class PreventBrokerScaleDownUtilsTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
-        PreventBrokerScaleDownUtils.canScaleDownBrokers(vertx, RECONCILIATION, cluster.removedNodes(), mockSecretOps, mock)
+        PreventBrokerScaleDownOperations operations = new PreventBrokerScaleDownOperations();
+
+        operations.canScaleDownBrokers(vertx, RECONCILIATION, cluster.removedNodes(), mockSecretOps, mock)
                 .onComplete(context.succeeding(s -> {
                     // the resource moved from ProposalPending to Stopped
                     assertThat(s.isEmpty(), is(false));
@@ -200,7 +204,9 @@ public class PreventBrokerScaleDownUtilsTest {
 
         Checkpoint checkpoint = context.checkpoint();
 
-        PreventBrokerScaleDownUtils.topicNames(RECONCILIATION, admin)
+        PreventBrokerScaleDownOperations operations = new PreventBrokerScaleDownOperations();
+
+        operations.topicNames(RECONCILIATION, admin)
                 .onComplete(context.succeeding(topicNames -> {
                     assertThat(topicNames.size(), is(1));
                     assertEquals(topicNames, Set.of("my-topic"));
@@ -225,7 +231,9 @@ public class PreventBrokerScaleDownUtilsTest {
 
         Checkpoint checkpoint = context.checkpoint();
 
-        PreventBrokerScaleDownUtils.describeTopics(RECONCILIATION, admin, Set.of("my-topic"))
+        PreventBrokerScaleDownOperations operations = new PreventBrokerScaleDownOperations();
+
+        operations.describeTopics(RECONCILIATION, admin, Set.of("my-topic"))
                 .onComplete(context.succeeding(topicDescriptions -> {
                     assertThat(topicDescriptions.size(), is(1));
                     checkpoint.flag();

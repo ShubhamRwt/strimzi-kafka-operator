@@ -25,7 +25,7 @@ import java.util.HashSet;
 /**
  * Class which contains several utility function which check if broker scale down can be done or not.
  */
-public class PreventBrokerScaleDownUtils {
+public class PreventBrokerScaleDownOperations {
 
     /* logger*/
     private static final ReconciliationLogger LOGGER = ReconciliationLogger.create(KafkaReconciler.class.getName());
@@ -40,7 +40,7 @@ public class PreventBrokerScaleDownUtils {
      * @param adminClientProvider Used to create the Admin client instance
      * @return Future which completes when the check is complete
      */
-    public static Future<Set<Integer>> canScaleDownBrokers(Vertx vertx, Reconciliation reconciliation, Set<Integer> removedNodes,
+    public Future<Set<Integer>> canScaleDownBrokers(Vertx vertx, Reconciliation reconciliation, Set<Integer> removedNodes,
                                                    SecretOperator secretOperator, AdminClientProvider adminClientProvider) {
 
         if (removedNodes.isEmpty()) {
@@ -61,7 +61,7 @@ public class PreventBrokerScaleDownUtils {
 
      * @return  returns a boolean future based on the outcome of the check
      */
-    public static Future<Set<Integer>> canScaleDownBrokerCheck(Vertx vertx, Reconciliation reconciliation,
+    public Future<Set<Integer>> canScaleDownBrokerCheck(Vertx vertx, Reconciliation reconciliation,
                                                           SecretOperator secretOperator, AdminClientProvider adminClientProvider, Set<Integer> idsToBeRemoved) {
 
         Promise<Set<Integer>> cannotScaleDown = Promise.promise();
@@ -116,7 +116,7 @@ public class PreventBrokerScaleDownUtils {
      * @param kafkaAdmin                    Instance of Kafka Admin
      * @return  return the set of topic names
      */
-    protected static Future<Set<String>> topicNames(Reconciliation reconciliation, Admin kafkaAdmin) {
+    protected Future<Set<String>> topicNames(Reconciliation reconciliation, Admin kafkaAdmin) {
         Promise<Set<String>> namesPromise = Promise.promise();
         kafkaAdmin.listTopics(new ListTopicsOptions().listInternal(true)).names()
                 .whenComplete((names, error) -> {
@@ -138,7 +138,7 @@ public class PreventBrokerScaleDownUtils {
      * @param names                Set of topic names
      * @return  Future which completes when the check is complete
      */
-    protected static Future<Collection<TopicDescription>> describeTopics(Reconciliation reconciliation, Admin kafkaAdmin, Set<String> names) {
+    protected Future<Collection<TopicDescription>> describeTopics(Reconciliation reconciliation, Admin kafkaAdmin, Set<String> names) {
         Promise<Collection<TopicDescription>> descPromise = Promise.promise();
         kafkaAdmin.describeTopics(names).allTopicNames()
                 .whenComplete((tds, error) -> {
@@ -160,7 +160,7 @@ public class PreventBrokerScaleDownUtils {
      * @param tds                            Collection of Topic description
      * @param idsContainingParitionReplicas  Set of broker ids containing partition replicas
      */
-    private static void brokerHasAnyReplicas(Reconciliation reconciliation, Collection<TopicDescription> tds, int podId, Set<Integer> idsContainingParitionReplicas) {
+    private void brokerHasAnyReplicas(Reconciliation reconciliation, Collection<TopicDescription> tds, int podId, Set<Integer> idsContainingParitionReplicas) {
 
         for (TopicDescription td : tds) {
             LOGGER.traceCr(reconciliation, td);

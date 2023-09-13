@@ -25,6 +25,7 @@ import io.strimzi.operator.cluster.ClusterOperatorConfig;
 import io.strimzi.operator.cluster.KafkaVersionTestUtils;
 import io.strimzi.operator.cluster.ResourceUtils;
 import io.strimzi.operator.cluster.model.AbstractModel;
+import io.strimzi.operator.common.Annotations;
 import io.strimzi.operator.common.model.ClientsCa;
 import io.strimzi.operator.cluster.model.ClusterCa;
 import io.strimzi.operator.cluster.model.KafkaCluster;
@@ -73,9 +74,11 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
+import static io.strimzi.operator.common.Annotations.ANNO_STRIMZI_IO_BYPASS_BROKER_SCALEDOWN_CHECK;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -792,6 +795,7 @@ public class KafkaAssemblyOperatorPodSetTest {
 
                     // Still one maybe-roll invocation
                     assertThat(zr.maybeRollZooKeeperInvocations, is(1));
+                    System.out.println(oldKafkaCluster.removedNodes());
 
                     // Scale-down of Kafka is done in one go => we should see two invocations (first from scale-down and second from regular patching)
                     assertThat(kafkaPodSetCaptor.getAllValues().size(), is(1));
@@ -810,6 +814,39 @@ public class KafkaAssemblyOperatorPodSetTest {
                     assertThat(cmDeletionCaptor.getAllValues().size(), is(2));
                     assertThat(cmDeletionCaptor.getAllValues(), is(List.of("my-cluster-kafka-3", "my-cluster-kafka-4")));
 
+                    async.flag();
+                })));
+    }
+
+    @Test
+    public void testScaleDownWithNonEmptyBroker(VertxTestContext context)  {
+
+        ResourceOperatorSupplier supplier = ResourceUtils.supplierWithMocks(false);
+
+        ClusterOperatorConfig config = ResourceUtils.dummyClusterOperatorConfig(VERSIONS);
+
+        PreventBrokerScaleDownOperations operations = supplier.brokerScaleDownOperations;
+        when(operations.canScaleDownBrokers(any(),any(), any(), any(), any())).thenReturn(Future.succeededFuture(Set.of(3)));
+
+        MockKafkaReconciler kr = new MockKafkaReconciler(
+                new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME),
+                vertx,
+                config,
+                supplier,
+                new PlatformFeaturesAvailability(false, KUBERNETES_VERSION),
+                KAFKA,
+                VERSION_CHANGE,
+                Map.of(),
+                Map.of(CLUSTER_NAME + "-kafka", IntStream.rangeClosed(0, 4).mapToObj(i -> CLUSTER_NAME + "-kafka-" + i).toList()),
+                CLUSTER_CA,
+                CLIENTS_CA);
+
+        Checkpoint async = context.checkpoint();
+        KafkaStatus status = new KafkaStatus();
+
+        kr.reconcile(status, Clock.systemUTC())
+                .onComplete(context.failing(v -> context.verify(() -> {
+                    assertEquals(v.getMessage(), "Cannot scale down brokers [3, 4] because brokers [3] are not empty");
                     async.flag();
                 })));
     }
@@ -890,13 +927,19 @@ public class KafkaAssemblyOperatorPodSetTest {
         int maybeRollKafkaInvocations = 0;
         Function<Pod, RestartReasons> kafkaPodNeedsRestart = null;
 
+        boolean skipBrokerScaleDown;
+
+
         public MockKafkaReconciler(Reconciliation reconciliation, Vertx vertx, ClusterOperatorConfig config, ResourceOperatorSupplier supplier, PlatformFeaturesAvailability pfa, Kafka kafkaAssembly, KafkaVersionChange versionChange, Map<String, Storage> oldStorage, Map<String, List<String>> currentPods, ClusterCa clusterCa, ClientsCa clientsCa) {
             super(reconciliation, kafkaAssembly, null, oldStorage, currentPods, clusterCa, clientsCa, versionChange, config, supplier, pfa, vertx);
+            this.skipBrokerScaleDown = Annotations.booleanAnnotation(kafkaAssembly, ANNO_STRIMZI_IO_BYPASS_BROKER_SCALEDOWN_CHECK, false);
+
         }
 
         @Override
         public Future<Void> reconcile(KafkaStatus kafkaStatus, Clock clock)    {
-            return manualPodCleaning()
+            return brokerScaleDownCheck(skipBrokerScaleDown)
+                    .compose(i -> manualPodCleaning())
                     .compose(i -> manualRollingUpdate())
                     .compose(i -> scaleDown())
                     .compose(i -> listeners())
