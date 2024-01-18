@@ -160,11 +160,13 @@ public class CruiseControlApiImpl implements CruiseControlApi {
 
     private void internalRebalance(String host, int port, String path, String userTaskId,
                                    AsyncResult<HttpClientRequest> request, Promise<CruiseControlRebalanceResponse> result) {
+
+        System.out.println(path);
         if (request.succeeded()) {
             if (idleTimeout != HTTP_DEFAULT_IDLE_TIMEOUT_SECONDS) {
                 request.result().idleTimeout(idleTimeout * 1000);
             }
-
+            System.out.println("hi");
             if (userTaskId != null) {
                 request.result().putHeader(CC_REST_API_USER_ID_HEADER, userTaskId);
             }
@@ -175,6 +177,7 @@ public class CruiseControlApiImpl implements CruiseControlApi {
 
             request.result().send(response -> {
                 if (response.succeeded()) {
+                    System.out.println();
                     if (response.result().statusCode() == 200 || response.result().statusCode() == 201) {
                         response.result().bodyHandler(buffer -> {
                             String userTaskID = response.result().getHeader(CC_REST_API_USER_ID_HEADER);
@@ -268,7 +271,7 @@ public class CruiseControlApiImpl implements CruiseControlApi {
                 .withParameter(CruiseControlParameters.JSON, "true")
                 .withAddBrokerParameters(options)
                 .build();
-
+        System.out.println(path);
         HttpClientOptions httpOptions = getHttpClientOptions();
 
         return HttpClientUtils.withHttpClient(vertx, httpOptions, (httpClient, result) -> {
@@ -427,6 +430,7 @@ public class CruiseControlApiImpl implements CruiseControlApi {
         String path = new PathBuilder(CruiseControlEndpoints.STOP)
                         .withParameter(CruiseControlParameters.JSON, "true").build();
 
+        System.out.println(path);
         HttpClientOptions options = getHttpClientOptions();
 
         return HttpClientUtils.withHttpClient(vertx, options, (httpClient, result) -> {

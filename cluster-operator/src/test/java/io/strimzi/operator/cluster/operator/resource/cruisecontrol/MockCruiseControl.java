@@ -311,6 +311,7 @@ public class MockCruiseControl {
                                 .withHeaders(header("User-Task-ID", REBALANCE_NO_GOALS_RESPONSE_UTID))
                                 .withDelay(TimeUnit.SECONDS, responseDelay));
 
+
         // Rebalance response with no goals set - verbose
         JsonBody jsonVerbose = getJsonFromResource("CC-Rebalance-no-goals-verbose.json");
 
@@ -329,6 +330,27 @@ public class MockCruiseControl {
                         response()
                                 .withBody(jsonVerbose)
                                 .withHeaders(header("User-Task-ID", REBALANCE_NO_GOALS_VERBOSE_RESPONSE_UTID))
+                                .withDelay(TimeUnit.SECONDS, responseDelay));
+
+
+        // Rebalance response with no goals set - no-verbose
+        JsonBody jsonNoVerboseParamter = getJsonFromResource("CC-Rebalance-no-goals.json");
+
+        ccServer
+                .when(
+                        request()
+                                .withMethod("POST")
+                                .withQueryStringParameter(Parameter.param(CruiseControlParameters.JSON.toString(), "true"))
+                                .withQueryStringParameter(Parameter.param(CruiseControlParameters.DRY_RUN.toString(), "true|false"))
+                                .withQueryStringParameter(buildBrokerIdParameter(endpoint))
+                                .withPath(endpoint.toString())
+                                .withHeader(AUTH_HEADER)
+                                .withSecure(true),
+                        Times.unlimited())
+                .respond(
+                        response()
+                                .withBody(jsonNoVerboseParamter)
+                                .withHeaders(header("User-Task-ID", REBALANCE_NO_GOALS_RESPONSE_UTID))
                                 .withDelay(TimeUnit.SECONDS, responseDelay));
     }
 
@@ -561,6 +583,15 @@ public class MockCruiseControl {
                                 .withBody(jsonStop)
                                 .withHeaders(header("User-Task-ID", "stopped"))
                                 .withDelay(TimeUnit.SECONDS, RESPONSE_DELAY_SEC));
+
+    }
+
+    /**
+     * Setup response of task being stopped.
+     */
+    public static void setupCCRemoveDiskResponse(ClientAndServer ccServer) throws IOException, URISyntaxException {
+
+
 
     }
 

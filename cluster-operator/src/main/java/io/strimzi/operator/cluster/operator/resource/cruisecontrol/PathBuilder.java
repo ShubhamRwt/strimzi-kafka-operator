@@ -89,6 +89,8 @@ public class PathBuilder {
     public PathBuilder withRebalanceParameters(RebalanceOptions options) {
         if (options != null) {
             PathBuilder builder = withAbstractRebalanceParameters(options)
+                    .withParameter(CruiseControlParameters.VERBOSE, String.valueOf(options.isVerbose()))
+                    .withParameter(CruiseControlParameters.SKIP_HARD_GOAL_CHECK, String.valueOf(options.isSkipHardGoalCheck()))
                     .withParameter(CruiseControlParameters.REBALANCE_DISK, String.valueOf(options.isRebalanceDisk()));
             addIfNotZero(builder, CruiseControlParameters.CONCURRENT_INTRA_PARTITION_MOVEMENTS, options.getConcurrentIntraBrokerPartitionMovements());
             return builder;
@@ -100,7 +102,6 @@ public class PathBuilder {
     private PathBuilder withAbstractRebalanceParameters(AbstractRebalanceOptions options) {
         if (options != null) {
             PathBuilder builder = withParameter(CruiseControlParameters.DRY_RUN, String.valueOf(options.isDryRun()));
-
             if (options.getExcludedTopics() != null) {
                 builder.withParameter(CruiseControlParameters.EXCLUDED_TOPICS, options.getExcludedTopics());
             }

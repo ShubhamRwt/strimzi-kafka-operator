@@ -715,10 +715,19 @@ public class KafkaRebalanceAssemblyOperator
 
         JsonArray brokerLoadBeforeOptimization;
         JsonArray brokerLoadAfterOptimization;
-        if (proposalJson.containsKey(CruiseControlRebalanceKeys.LOAD_BEFORE_OPTIMIZATION.getKey()) &&
+        if (!kafkaRebalance.getSpec().getMode().equals(KafkaRebalanceMode.REMOVE_DISKS) && proposalJson.containsKey(CruiseControlRebalanceKeys.LOAD_BEFORE_OPTIMIZATION.getKey()) &&
                 proposalJson.containsKey(CruiseControlRebalanceKeys.LOAD_AFTER_OPTIMIZATION.getKey())) {
             brokerLoadBeforeOptimization = proposalJson
                     .getJsonObject(CruiseControlRebalanceKeys.LOAD_BEFORE_OPTIMIZATION.getKey())
+                    .getJsonArray(CruiseControlRebalanceKeys.BROKERS.getKey());
+            brokerLoadAfterOptimization = proposalJson
+                    .getJsonObject(CruiseControlRebalanceKeys.LOAD_AFTER_OPTIMIZATION.getKey())
+                    .getJsonArray(CruiseControlRebalanceKeys.BROKERS.getKey());
+        } else if (kafkaRebalance.getSpec().getMode().equals(KafkaRebalanceMode.REMOVE_DISKS) || !proposalJson.containsKey(CruiseControlRebalanceKeys.LOAD_BEFORE_OPTIMIZATION.getKey()) &&
+                proposalJson.containsKey(CruiseControlRebalanceKeys.LOAD_AFTER_OPTIMIZATION.getKey())) {
+            System.out.println(kafkaRebalance.getSpec().getMode().toString());
+            brokerLoadBeforeOptimization = proposalJson
+                    .getJsonObject(CruiseControlRebalanceKeys.LOAD_AFTER_OPTIMIZATION.getKey())
                     .getJsonArray(CruiseControlRebalanceKeys.BROKERS.getKey());
             brokerLoadAfterOptimization = proposalJson
                     .getJsonObject(CruiseControlRebalanceKeys.LOAD_AFTER_OPTIMIZATION.getKey())
