@@ -60,48 +60,46 @@ import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(VertxExtension.class)
 public class ZooKeeperEraserTest {
 
     private static final String NAMESPACE = "my-namespace";
-    private static final String NAME = "name";
+    private static final String NAME = "my-cluster";
     private static final KafkaVersion.Lookup VERSIONS = KafkaVersionTestUtils.getKafkaVersionLookup();
 
     private static final SharedEnvironmentProvider SHARED_ENV_PROVIDER = new MockSharedEnvironmentProvider();
 
     private static final Kafka KAFKA = new KafkaBuilder()
             .withNewMetadata()
-            .withName(NAME)
-            .withNamespace(NAMESPACE)
+                .withName(NAME)
+                .withNamespace(NAMESPACE)
             .endMetadata()
             .withNewSpec()
-            .withNewKafka()
-            .withReplicas(3)
-            .withListeners(new GenericKafkaListenerBuilder()
-                    .withName("plain")
-                    .withPort(9092)
-                    .withType(KafkaListenerType.INTERNAL)
-                    .withTls(false)
-                    .build())
-            .withNewEphemeralStorage()
-            .endEphemeralStorage()
-            .endKafka()
-            .withNewZookeeper()
-            .withReplicas(3)
-            .withNewPersistentClaimStorage()
-            .withSize("123")
-            .withStorageClass("foo")
-            .endPersistentClaimStorage()
-            .endZookeeper()
+                .withNewKafka()
+                    .withReplicas(3)
+                    .withListeners(new GenericKafkaListenerBuilder()
+                            .withName("plain")
+                            .withPort(9092)
+                            .withType(KafkaListenerType.INTERNAL)
+                            .withTls(false)
+                            .build())
+                    .withNewEphemeralStorage()
+                    .endEphemeralStorage()
+                .endKafka()
+                .withNewZookeeper()
+                    .withReplicas(3)
+                    .withNewPersistentClaimStorage()
+                        .withSize("123")
+                        .withStorageClass("foo")
+                    .endPersistentClaimStorage()
+                .endZookeeper()
             .endSpec()
             .build();
 
-
     @Test
-    public void testZookeperEraserReconcileWithPersistentClaimStorage(VertxTestContext context) {
+    public void testZookeperEraserReconcile(VertxTestContext context) {
 
         ResourceOperatorSupplier supplier = ResourceUtils.supplierWithMocks(false);
         ServiceAccountOperator mockSaOps = supplier.serviceAccountOperations;
@@ -117,8 +115,8 @@ public class ZooKeeperEraserTest {
         StrimziPodSet zkPodSet = zkCluster.generatePodSet(KAFKA.getSpec().getZookeeper().getReplicas(), false, null, null, podNum -> null);
 
         ArgumentCaptor<StrimziPodSet> zkPodSetCaptor =  ArgumentCaptor.forClass(StrimziPodSet.class);
-        when(mockPodSetOps.getAsync(any(), eq(zkCluster.getComponentName()))).thenReturn(Future.succeededFuture(zkPodSet));
-        when(mockPodSetOps.reconcile(any(), any(), eq(zkCluster.getComponentName()), zkPodSetCaptor.capture())).thenAnswer(i -> Future.succeededFuture(ReconcileResult.noop(i.getArgument(3))));
+        when(mockPodSetOps.getAsync(any(), any())).thenReturn(Future.succeededFuture(zkPodSet));
+        when(mockPodSetOps.reconcile(any(), any(), any(), zkPodSetCaptor.capture())).thenAnswer(i -> Future.succeededFuture(ReconcileResult.noop(i.getArgument(3))));
 
         ArgumentCaptor<Secret> secretCaptor = ArgumentCaptor.forClass(Secret.class);
         when(mockSecretOps.reconcile(any(), anyString(), any(), secretCaptor.capture())).thenReturn(Future.succeededFuture());
