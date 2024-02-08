@@ -76,7 +76,6 @@ public class KafkaMetadataStateManagerMockTest {
 
     private static final String NAMESPACE = "my-namespace";
     private static final String CLUSTER_NAME = "my-cluster";
-
     private static final ClusterOperatorConfig CONFIG = ResourceUtils.dummyClusterOperatorConfig();
     private static final KubernetesVersion KUBERNETES_VERSION = KubernetesVersion.MINIMAL_SUPPORTED_VERSION;
     private static final MockCertManager CERT_MANAGER = new MockCertManager();
@@ -92,7 +91,7 @@ public class KafkaMetadataStateManagerMockTest {
     }
 
     private final static ClusterCa CLUSTER_CA = new ClusterCa(
-            Reconciliation.DUMMY_RECONCILIATION,
+            RECONCILIATION,
             CERT_MANAGER,
             PASSWORD_GENERATOR,
             CLUSTER_NAME,
@@ -101,7 +100,7 @@ public class KafkaMetadataStateManagerMockTest {
     );
 
     private final static ClientsCa CLIENTS_CA = new ClientsCa(
-            Reconciliation.DUMMY_RECONCILIATION,
+            RECONCILIATION,
             new OpenSslCertManager(),
             new PasswordGenerator(10, "a", "a"),
             KafkaResources.clientsCaCertificateSecretName(CLUSTER_NAME),
@@ -132,14 +131,15 @@ public class KafkaMetadataStateManagerMockTest {
             .endSpec()
             .build();
 
-    private static KafkaCluster createKafkaCluster(Kafka kafka)   {
+    private static KafkaCluster createKafkaCluster(Reconciliation reconciliation, Kafka kafka, KafkaMetadataConfigurationState state)   {
+        List<KafkaPool> pools = NodePoolUtils.createKafkaPools(reconciliation, kafka, List.of(CONTROLLERS, BROKERS), Map.of(), Map.of(), true, SHARED_ENV_PROVIDER);
         return KafkaCluster.fromCrd(
-                Reconciliation.DUMMY_RECONCILIATION,
+                reconciliation,
                 kafka,
-                POOLS,
+                pools,
                 VERSIONS,
                 KafkaVersionTestUtils.DEFAULT_ZOOKEEPER_VERSION_CHANGE,
-                KafkaMetadataConfigurationState.ZK,
+                state,
                 null,
                 SHARED_ENV_PROVIDER);
     }
@@ -159,6 +159,7 @@ public class KafkaMetadataStateManagerMockTest {
                 .withResources(new ResourceRequirementsBuilder().withRequests(Map.of("cpu", new Quantity("4"))).build())
             .endSpec()
             .build();
+
     private final static KafkaNodePool BROKERS = new KafkaNodePoolBuilder()
             .withNewMetadata()
                 .withName("brokers")
@@ -174,7 +175,6 @@ public class KafkaMetadataStateManagerMockTest {
                 .withResources(new ResourceRequirementsBuilder().withRequests(Map.of("cpu", new Quantity("6"))).build())
             .endSpec()
             .build();
-    private static final List<KafkaPool> POOLS = NodePoolUtils.createKafkaPools(Reconciliation.DUMMY_RECONCILIATION, KAFKA, List.of(CONTROLLERS, BROKERS), Map.of(), Map.of(), true, SHARED_ENV_PROVIDER);
 
     /**
      * Tests migration from Zookeeper State to KRaftPostMigration State.
@@ -201,17 +201,19 @@ public class KafkaMetadataStateManagerMockTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
+        MockKafkaMetadataStateManager stateManager = new MockKafkaMetadataStateManager(RECONCILIATION, kafka, CONFIG.featureGates().useKRaftEnabled());
+
         MockKafkaReconciler kr = new MockKafkaReconciler(
-                new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME),
+                RECONCILIATION,
                 vertx,
                 CONFIG,
                 supplier,
                 new PlatformFeaturesAvailability(false, KUBERNETES_VERSION),
                 kafka,
                 List.of(BROKERS, CONTROLLERS),
-                createKafkaCluster(KAFKA),
                 CLUSTER_CA,
-                CLIENTS_CA);
+                CLIENTS_CA,
+                stateManager);
 
         KafkaStatus status = new KafkaStatus();
 
@@ -255,17 +257,19 @@ public class KafkaMetadataStateManagerMockTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
+        MockKafkaMetadataStateManager stateManager = new MockKafkaMetadataStateManager(RECONCILIATION, kafka, CONFIG.featureGates().useKRaftEnabled());
+
         MockKafkaReconciler kr = new MockKafkaReconciler(
-                new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME),
+                RECONCILIATION,
                 vertx,
                 CONFIG,
                 supplier,
                 new PlatformFeaturesAvailability(false, KUBERNETES_VERSION),
                 kafka,
                 List.of(BROKERS, CONTROLLERS),
-                createKafkaCluster(KAFKA),
                 CLUSTER_CA,
-                CLIENTS_CA);
+                CLIENTS_CA,
+                stateManager);
 
         KafkaStatus status = new KafkaStatus();
 
@@ -304,17 +308,19 @@ public class KafkaMetadataStateManagerMockTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
+        MockKafkaMetadataStateManager stateManager = new MockKafkaMetadataStateManager(RECONCILIATION, kafka, CONFIG.featureGates().useKRaftEnabled());
+
         MockKafkaReconciler kr = new MockKafkaReconciler(
-                new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME),
+                RECONCILIATION,
                 vertx,
                 CONFIG,
                 supplier,
                 new PlatformFeaturesAvailability(false, KUBERNETES_VERSION),
                 kafka,
                 List.of(BROKERS, CONTROLLERS),
-                createKafkaCluster(KAFKA),
                 CLUSTER_CA,
-                CLIENTS_CA);
+                CLIENTS_CA,
+                stateManager);
 
         KafkaStatus status = new KafkaStatus();
 
@@ -350,17 +356,19 @@ public class KafkaMetadataStateManagerMockTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
+        MockKafkaMetadataStateManager stateManager = new MockKafkaMetadataStateManager(RECONCILIATION, kafka, CONFIG.featureGates().useKRaftEnabled());
+
         MockKafkaReconciler kr = new MockKafkaReconciler(
-                new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME),
+                RECONCILIATION,
                 vertx,
                 CONFIG,
                 supplier,
                 new PlatformFeaturesAvailability(false, KUBERNETES_VERSION),
                 kafka,
                 List.of(BROKERS, CONTROLLERS),
-                createKafkaCluster(KAFKA),
                 CLUSTER_CA,
-                CLIENTS_CA);
+                CLIENTS_CA,
+                stateManager);
 
         KafkaStatus status = new KafkaStatus();
 
@@ -395,24 +403,26 @@ public class KafkaMetadataStateManagerMockTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
+        MockKafkaMetadataStateManager stateManager = new MockKafkaMetadataStateManager(RECONCILIATION, kafka, CONFIG.featureGates().useKRaftEnabled());
+
         MockKafkaReconciler kr = new MockKafkaReconciler(
-                new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME),
+                RECONCILIATION,
                 vertx,
                 CONFIG,
                 supplier,
                 new PlatformFeaturesAvailability(false, KUBERNETES_VERSION),
                 kafka,
                 List.of(BROKERS, CONTROLLERS),
-                createKafkaCluster(KAFKA),
                 CLUSTER_CA,
-                CLIENTS_CA);
+                CLIENTS_CA,
+                stateManager);
 
         KafkaStatus status = new KafkaStatus();
 
         Checkpoint async = context.checkpoint();
         kr.reconcile(status, Clock.systemUTC()).onComplete(res -> context.verify(() -> {
             assertTrue(status.getConditions().stream().anyMatch(condition -> "KafkaMetadataStateWarning".equals(condition.getReason())));
-            assertEquals(status.getConditions().get(2).getMessage(), "The strimzi.io/kraft annotation can't be set to migration, rollback or disabled values because the cluster is already KRaft.");
+            assertEquals(status.getConditions().get(4).getMessage(), "The strimzi.io/kraft annotation can't be set to migration, rollback or disabled values because the cluster is already KRaft.");
             assertEquals(status.getKafkaMetadataState(), KRaft.name());
             async.flag();
         }));
@@ -442,17 +452,19 @@ public class KafkaMetadataStateManagerMockTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
+        MockKafkaMetadataStateManager stateManager = new MockKafkaMetadataStateManager(RECONCILIATION, kafka, CONFIG.featureGates().useKRaftEnabled());
+
         MockKafkaReconciler kr = new MockKafkaReconciler(
-                new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME),
+                RECONCILIATION,
                 vertx,
                 CONFIG,
                 supplier,
                 new PlatformFeaturesAvailability(false, KUBERNETES_VERSION),
                 kafka,
                 List.of(BROKERS, CONTROLLERS),
-                createKafkaCluster(KAFKA),
                 CLUSTER_CA,
-                CLIENTS_CA);
+                CLIENTS_CA,
+                stateManager);
 
         KafkaStatus status = new KafkaStatus();
 
@@ -491,17 +503,19 @@ public class KafkaMetadataStateManagerMockTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
+        MockKafkaMetadataStateManager stateManager = new MockKafkaMetadataStateManager(RECONCILIATION, kafka, CONFIG.featureGates().useKRaftEnabled());
+
         MockKafkaReconciler kr = new MockKafkaReconciler(
-                new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME),
+                RECONCILIATION,
                 vertx,
                 CONFIG,
                 supplier,
                 new PlatformFeaturesAvailability(false, KUBERNETES_VERSION),
                 kafka,
                 List.of(BROKERS, CONTROLLERS),
-                createKafkaCluster(KAFKA),
                 CLUSTER_CA,
-                CLIENTS_CA);
+                CLIENTS_CA,
+                stateManager);
 
         KafkaStatus status = new KafkaStatus();
 
@@ -539,17 +553,19 @@ public class KafkaMetadataStateManagerMockTest {
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.clusterCaCertificateSecretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
         when(mockSecretOps.getAsync(eq(NAMESPACE), eq(KafkaResources.secretName(CLUSTER_NAME)))).thenReturn(Future.succeededFuture(secret));
 
+        MockKafkaMetadataStateManager stateManager = new MockKafkaMetadataStateManager(RECONCILIATION, kafka, CONFIG.featureGates().useKRaftEnabled());
+
         MockKafkaReconciler kr = new MockKafkaReconciler(
-                new Reconciliation("test-trigger", Kafka.RESOURCE_KIND, NAMESPACE, CLUSTER_NAME),
+                RECONCILIATION,
                 vertx,
                 CONFIG,
                 supplier,
                 new PlatformFeaturesAvailability(false, KUBERNETES_VERSION),
                 kafka,
                 List.of(BROKERS, CONTROLLERS),
-                createKafkaCluster(KAFKA),
                 CLUSTER_CA,
-                CLIENTS_CA);
+                CLIENTS_CA,
+                stateManager);
 
         KafkaStatus status = new KafkaStatus();
 
@@ -589,8 +605,8 @@ public class KafkaMetadataStateManagerMockTest {
     static class MockKafkaReconciler extends KafkaReconciler {
         private static final ReconciliationLogger LOGGER = ReconciliationLogger.create(MockKafkaReconciler.class.getName());
 
-        public MockKafkaReconciler(Reconciliation reconciliation, Vertx vertx, ClusterOperatorConfig config, ResourceOperatorSupplier supplier, PlatformFeaturesAvailability pfa, Kafka kafka, List<KafkaNodePool> nodePools, KafkaCluster kafkaCluster, ClusterCa clusterCa, ClientsCa clientsCa) {
-            super(reconciliation, kafka, nodePools, createKafkaCluster(kafka), clusterCa, clientsCa, config, supplier, pfa, vertx, new MockKafkaMetadataStateManager(reconciliation, kafka, config.featureGates().useKRaftEnabled()));
+        public MockKafkaReconciler(Reconciliation reconciliation, Vertx vertx, ClusterOperatorConfig config, ResourceOperatorSupplier supplier, PlatformFeaturesAvailability pfa, Kafka kafka, List<KafkaNodePool> nodePools, ClusterCa clusterCa, ClientsCa clientsCa, KafkaMetadataStateManager stateManager) {
+            super(reconciliation, kafka, nodePools, createKafkaCluster(reconciliation, kafka, stateManager.getMetadataConfigurationState()), clusterCa, clientsCa, config, supplier, pfa, vertx, stateManager);
         }
 
         @Override
