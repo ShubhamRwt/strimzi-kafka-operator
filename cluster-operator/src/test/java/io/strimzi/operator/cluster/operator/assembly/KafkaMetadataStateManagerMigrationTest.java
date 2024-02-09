@@ -72,7 +72,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(VertxExtension.class)
-public class KafkaMetadataStateManagerMockTest {
+public class KafkaMetadataStateManagerMigrationTest {
 
     private static final String NAMESPACE = "my-namespace";
     private static final String CLUSTER_NAME = "my-cluster";
