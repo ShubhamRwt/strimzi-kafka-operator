@@ -125,7 +125,7 @@ public class KafkaClusterMigrationTest {
 
             assertThat(configuration, containsString("node.id=0"));
             // from ZK up to MIGRATION ...
-            if (state.isZooKeeperOrMigration()) {
+            if (state.isZooKeeperToMigration()) {
                 // ... has ZooKeeper connection configured
                 assertThat(configuration, containsString("zookeeper.connect"));
                 // ... broker.id still set
@@ -148,7 +148,7 @@ public class KafkaClusterMigrationTest {
                 assertThat(configuration, not(containsString("zookeeper.metadata.migration.enable")));
             }
             // from MIGRATION up to KRAFT, the broker has KRaft controllers configured
-            if (state.isMigrationOrKRaft()) {
+            if (state.isMigrationToKRaft()) {
                 assertThat(configuration, containsString("controller.listener.names=CONTROLPLANE-9090"));
                 assertThat(configuration, containsString("controller.quorum.voters=3@my-cluster-controllers-3.my-cluster-kafka-brokers.my-namespace.svc.cluster.local:9090,4@my-cluster-controllers-4.my-cluster-kafka-brokers.my-namespace.svc.cluster.local:9090,5@my-cluster-controllers-5.my-cluster-kafka-brokers.my-namespace.svc.cluster.local:9090"));
             } else {
@@ -156,7 +156,7 @@ public class KafkaClusterMigrationTest {
                 assertThat(configuration, not(containsString("controller.quorum.voters")));
             }
             // only from POST_MIGRATION to KRAFT, the broker has the process role configured
-            if (state.isPostMigrationOrKRaft()) {
+            if (state.isPostMigrationToKRaft()) {
                 assertThat(configuration, containsString("process.roles=broker"));
             } else {
                 assertThat(configuration, not(containsString("process.roles=broker")));
@@ -181,7 +181,7 @@ public class KafkaClusterMigrationTest {
 
         for (KafkaMetadataConfigurationState state : KafkaMetadataConfigurationState.values()) {
             // controllers don't make sense in ZooKeeper state, but only from pre-migration to KRaft
-            if (state.isPreMigrationOrKRaft()) {
+            if (state.isPreMigrationToKRaft()) {
                 KafkaCluster kc = KafkaCluster.fromCrd(
                         Reconciliation.DUMMY_RECONCILIATION,
                         KAFKA,
@@ -200,7 +200,7 @@ public class KafkaClusterMigrationTest {
                 assertThat(configuration, not(containsString("broker.id")));
 
                 // from PRE_MIGRATION up to POST_MIGRATION ...
-                if (state.isPreMigrationOrKRaft() && !state.isKRaft()) {
+                if (state.isPreMigrationToKRaft() && !state.isKRaft()) {
                     // ... has ZooKeeper connection configured
                     assertThat(configuration, containsString("zookeeper.connect"));
                     // ... has the ZooKeeper migration flag enabled
@@ -211,7 +211,7 @@ public class KafkaClusterMigrationTest {
                 }
 
                 // up to POST_MIGRATION ...
-                if (state.isZooKeeperOrPostMigration()) {
+                if (state.isZooKeeperToPostMigration()) {
                     // .. replication listener configured, before being full KRaft
                     assertThat(configuration, containsString("listener.name.replication-9091"));
                     assertThat(configuration, containsString("listener.security.protocol.map=CONTROLPLANE-9090:SSL,REPLICATION-9091:SSL"));
@@ -251,7 +251,7 @@ public class KafkaClusterMigrationTest {
             List<ContainerPort> ports = kc.getContainerPortList(KAFKA_POOL_CONTROLLERS);
             // control plane port is always set
             assertThat(ports.get(0).getContainerPort(), is(9090));
-            if (state.isZooKeeperOrPostMigration()) {
+            if (state.isZooKeeperToPostMigration()) {
                 assertThat(ports.size(), is(3));
                 // replication and clients only up to post-migration to contact brokers
                 assertThat(ports.get(1).getContainerPort(), is(9091));
@@ -262,7 +262,7 @@ public class KafkaClusterMigrationTest {
 
             // brokers
             ports = kc.getContainerPortList(KAFKA_POOL_BROKERS);
-            if (state.isZooKeeperOrMigration()) {
+            if (state.isZooKeeperToMigration()) {
                 assertThat(ports.size(), is(3));
                 // control plane port exposed up to migration when it's still ZooKeeper in the configuration
                 assertThat(ports.get(0).getContainerPort(), is(9090));
@@ -341,7 +341,7 @@ public class KafkaClusterMigrationTest {
 
             String configuration = kc.generatePerBrokerConfiguration(0, advertisedHostnames, advertisedPorts);
 
-            if (state.isPostMigrationOrKRaft()) {
+            if (state.isPostMigrationToKRaft()) {
                 assertThat(configuration, containsString("authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer"));
             } else {
                 assertThat(configuration, containsString("authorizer.class.name=kafka.security.authorizer.AclAuthorizer"));
@@ -372,7 +372,7 @@ public class KafkaClusterMigrationTest {
 
         for (KafkaMetadataConfigurationState state : KafkaMetadataConfigurationState.values()) {
             // controllers don't make sense in ZooKeeper state, but only from pre-migration to KRaft
-            if (state.isPreMigrationOrKRaft()) {
+            if (state.isPreMigrationToKRaft()) {
                 KafkaCluster kc = KafkaCluster.fromCrd(
                         Reconciliation.DUMMY_RECONCILIATION,
                         kafka,

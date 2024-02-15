@@ -65,15 +65,15 @@ public class KafkaClusterCreator {
      * @param vertx                     Vert.x instance
      * @param reconciliation            Reconciliation marker
      * @param config                    Cluster Operator configuration
-     * @param supplier                  Resource Operators supplier
      * @param kafkaMetadataConfigState  Metadata state related to nodes configuration
+     * @param supplier                  Resource Operators supplier
      */
     public KafkaClusterCreator(
             Vertx vertx,
             Reconciliation reconciliation,
             ClusterOperatorConfig config,
-            ResourceOperatorSupplier supplier,
-            KafkaMetadataConfigurationState kafkaMetadataConfigState
+            KafkaMetadataConfigurationState kafkaMetadataConfigState,
+            ResourceOperatorSupplier supplier
     ) {
         this.reconciliation = reconciliation;
         this.versions = config.versions();
@@ -351,8 +351,8 @@ public class KafkaClusterCreator {
         // NOTE: this is important to drive the right validation happening in node pools (i.e. roles on node pools, storage, number of controllers, ...)
 
         // We prepare the KafkaPool models and create the KafkaCluster model
-        List<KafkaPool> pools = NodePoolUtils.createKafkaPools(reconciliation, kafkaCr, nodePoolCrs, oldStorage, currentPods, kafkaMetadataConfigState.isPreMigrationOrKRaft(), sharedEnvironmentProvider);
-        String clusterId = kafkaMetadataConfigState.isPreMigrationOrKRaft() ? NodePoolUtils.getOrGenerateKRaftClusterId(kafkaCr, nodePoolCrs) : NodePoolUtils.getClusterIdIfSet(kafkaCr, nodePoolCrs);
+        List<KafkaPool> pools = NodePoolUtils.createKafkaPools(reconciliation, kafkaCr, nodePoolCrs, oldStorage, currentPods, kafkaMetadataConfigState.isPreMigrationToKRaft(), sharedEnvironmentProvider);
+        String clusterId = kafkaMetadataConfigState.isPreMigrationToKRaft() ? NodePoolUtils.getOrGenerateKRaftClusterId(kafkaCr, nodePoolCrs) : NodePoolUtils.getClusterIdIfSet(kafkaCr, nodePoolCrs);
         return KafkaCluster.fromCrd(reconciliation, kafkaCr, pools, versions, versionChange, kafkaMetadataConfigState, clusterId, sharedEnvironmentProvider);
     }
 

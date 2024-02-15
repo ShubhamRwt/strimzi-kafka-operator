@@ -4,13 +4,11 @@
  */
 package io.strimzi.operator.cluster.operator.assembly;
 
-import io.strimzi.api.kafka.model.kafka.Kafka;
 import io.strimzi.api.kafka.model.kafka.KafkaResources;
-import io.strimzi.operator.cluster.ClusterOperatorConfig;
-import io.strimzi.operator.cluster.model.ZookeeperCluster;
 import io.strimzi.operator.cluster.operator.resource.ResourceOperatorSupplier;
 import io.strimzi.operator.common.Reconciliation;
 import io.strimzi.operator.common.ReconciliationLogger;
+import io.strimzi.operator.common.model.Labels;
 import io.strimzi.operator.common.operator.resource.ConfigMapOperator;
 import io.strimzi.operator.common.operator.resource.NetworkPolicyOperator;
 import io.strimzi.operator.common.operator.resource.PodDisruptionBudgetOperator;
@@ -33,8 +31,6 @@ public class ZooKeeperEraser {
     private static final ReconciliationLogger LOGGER = ReconciliationLogger.create(ZooKeeperEraser.class.getName());
 
     private final Reconciliation reconciliation;
-    private final ZookeeperCluster zk;
-    private final boolean isNetworkPolicyGeneration;
     private final StrimziPodSetOperator strimziPodSetOperator;
     private final SecretOperator secretOperator;
     private final ServiceAccountOperator serviceAccountOperator;
@@ -49,20 +45,13 @@ public class ZooKeeperEraser {
      * Constructs the ZooKeeper eraser
      *
      * @param reconciliation            Reconciliation marker
-     * @param config                    Cluster Operator Configuration
      * @param supplier                  Supplier with Kubernetes Resource Operators
-     * @param kafkaAssembly             The Kafka custom resource
      */
     public ZooKeeperEraser(
             Reconciliation reconciliation,
-            ClusterOperatorConfig config,
-            ResourceOperatorSupplier supplier,
-            Kafka kafkaAssembly
+            ResourceOperatorSupplier supplier
     ) {
         this.reconciliation = reconciliation;
-        // NOTE: we are going to use the eraser for deleting ZooKeeper so we are not interested in providing old storage and replicas parameters
-        this.zk = ZookeeperCluster.fromCrd(reconciliation, kafkaAssembly, config.versions(), null, 0, supplier.sharedEnvironmentProvider);
-        this.isNetworkPolicyGeneration = config.isNetworkPolicyGeneration();
 
         this.strimziPodSetOperator = supplier.strimziPodSetOperator;
         this.secretOperator = supplier.secretOperations;
@@ -101,7 +90,7 @@ public class ZooKeeperEraser {
      * @return  Completes when the JMX secret is successfully deleted
      */
     protected Future<Void> jmxSecret() {
-        return secretOperator.deleteAsync(reconciliation, reconciliation.namespace(), zk.jmx().secretName(), true);
+        return secretOperator.deleteAsync(reconciliation, reconciliation.namespace(), KafkaResources.zookeeperJmxSecretName(reconciliation.name()), true);
     }
 
     /**
@@ -184,7 +173,11 @@ public class ZooKeeperEraser {
       @return  Future which completes when the PVCs which should be deleted
      */
     protected Future<Void> deletePersistentClaims() {
-        return pvcOperator.listAsync(reconciliation.namespace(), zk.getSelectorLabels())
+        Labels zkSelectorLabels = Labels.EMPTY
+                .withStrimziKind(reconciliation.kind())
+                .withStrimziCluster(reconciliation.name())
+                .withStrimziName(KafkaResources.zookeeperComponentName(reconciliation.name()));
+        return pvcOperator.listAsync(reconciliation.namespace(), zkSelectorLabels)
                 .compose(pvcs -> {
                     List<String> maybeDeletePvcs = pvcs.stream().map(pvc -> pvc.getMetadata().getName()).collect(Collectors.toList());
                     // not having owner reference on the PVC means corresponding spec.zookeeper.storage.deleteClaim is false, so we don't want to delete

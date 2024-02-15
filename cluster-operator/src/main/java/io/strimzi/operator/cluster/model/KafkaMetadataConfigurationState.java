@@ -76,35 +76,35 @@ public enum KafkaMetadataConfigurationState {
     /**
      * @return if the Kafka metadata configuration state is from ZooKeeper-based up to KRaft migration (and dual-write) going on
      */
-    public boolean isZooKeeperOrMigration() {
+    public boolean isZooKeeperToMigration() {
         return this.ordinal() <= MIGRATION.ordinal();
     }
 
     /**
      * @return if the Kafka metadata configuration state is from ZooKeeper-based up to KRaft post-migration
      */
-    public boolean isZooKeeperOrPostMigration() {
+    public boolean isZooKeeperToPostMigration() {
         return this.ordinal() <= POST_MIGRATION.ordinal();
     }
 
     /**
      * @return if the Kafka metadata configuration state is from KRaft pre-migration up to the full KRaft-based
      */
-    public boolean isPreMigrationOrKRaft() {
+    public boolean isPreMigrationToKRaft() {
         return this.ordinal() >= PRE_MIGRATION.ordinal();
     }
 
     /**
      * @return if the Kafka metadata configuration state is from KRaft post-migration up to the full KRaft-based
      */
-    public boolean isPostMigrationOrKRaft() {
+    public boolean isPostMigrationToKRaft() {
         return this.ordinal() >= POST_MIGRATION.ordinal();
     }
 
     /**
      * @return if the Kafka metadata configuration state is from KRaft migration up to the full KRaft-based
      */
-    public boolean isMigrationOrKRaft() {
+    public boolean isMigrationToKRaft() {
         return this.ordinal() >= MIGRATION.ordinal();
     }
 }

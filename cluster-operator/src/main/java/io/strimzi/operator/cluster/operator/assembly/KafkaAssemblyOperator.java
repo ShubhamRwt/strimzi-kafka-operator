@@ -218,10 +218,10 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
 
         KafkaMetadataConfigurationState kafkaMetadataConfigState = reconcileState.kafkaMetadataStateManager.getMetadataConfigurationState();
         // since PRE_MIGRATION phase (because it's when controllers are deployed during migration) we need to validate usage of node pools and features for KRaft
-        LOGGER.infoCr(reconcileState.reconciliation, "KafkaMetadataConfigurationState = {}, isPreMigrationOrKRaft = {}", kafkaMetadataConfigState, kafkaMetadataConfigState.isPreMigrationOrKRaft());
+        LOGGER.infoCr(reconcileState.reconciliation, "KafkaMetadataConfigurationState = {}, isPreMigrationOrKRaft = {}", kafkaMetadataConfigState, kafkaMetadataConfigState.isPreMigrationToKRaft());
         boolean nodePoolsEnabled = featureGates.kafkaNodePoolsEnabled() && ReconcilerUtils.nodePoolsEnabled(reconcileState.kafkaAssembly);
 
-        if (kafkaMetadataConfigState.isPreMigrationOrKRaft()) {
+        if (kafkaMetadataConfigState.isPreMigrationToKRaft()) {
             // Makes sure KRaft is used only with KafkaNodePool custom resources and not with virtual node pools
             if (!nodePoolsEnabled)  {
                 throw new InvalidConfigurationException("The UseKRaft feature gate can be used only together with a Kafka cluster based on the KafkaNodePool resources.");
@@ -580,10 +580,8 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
             ZooKeeperEraser zooKeeperEraser =
                     new ZooKeeperEraser(
                             reconciliation,
-                            config,
-                            supplier,
-                            kafkaAssembly
-                            );
+                            supplier
+                    );
 
             return Future.succeededFuture(zooKeeperEraser);
         }
@@ -678,7 +676,7 @@ public class KafkaAssemblyOperator extends AbstractAssemblyOperator<KubernetesCl
                             currentPods.put(sts.getMetadata().getName(), IntStream.range(0, sts.getSpec().getReplicas()).mapToObj(i -> KafkaResources.kafkaPodName(kafkaAssembly.getMetadata().getName(), i)).toList());
                         }
 
-                        return new KafkaClusterCreator(vertx, reconciliation, config, supplier, kafkaMetadataStateManager.getMetadataConfigurationState())
+                        return new KafkaClusterCreator(vertx, reconciliation, config, kafkaMetadataStateManager.getMetadataConfigurationState(), supplier)
                                 .prepareKafkaCluster(kafkaAssembly, nodePools, oldStorage, currentPods, versionChange, kafkaStatus, true)
                                 .compose(kafkaCluster -> {
                                     // We store this for use with Cruise Control later. As these configurations might

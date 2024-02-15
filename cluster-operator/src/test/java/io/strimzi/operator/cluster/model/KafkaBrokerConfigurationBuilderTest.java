@@ -24,7 +24,6 @@ import io.strimzi.api.kafka.model.kafka.listener.GenericKafkaListenerConfigurati
 import io.strimzi.api.kafka.model.kafka.listener.KafkaListenerAuthenticationOAuth;
 import io.strimzi.api.kafka.model.kafka.listener.KafkaListenerAuthenticationOAuthBuilder;
 import io.strimzi.api.kafka.model.kafka.listener.KafkaListenerType;
-import io.strimzi.api.kafka.model.nodepool.ProcessRoles;
 import io.strimzi.kafka.oauth.server.ServerConfig;
 import io.strimzi.operator.cluster.model.cruisecontrol.CruiseControlMetricsReporter;
 import io.strimzi.operator.common.Reconciliation;
@@ -91,8 +90,9 @@ public class KafkaBrokerConfigurationBuilderTest {
                 new NodeRef("my-cluster-kafka-2", 2, "kafka", true, true)
         );
 
-        String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.KRAFT)
-                .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.BROKER, ProcessRoles.CONTROLLER), nodes)
+        NodeRef nodeRef = nodes.stream().filter(nr -> nr.nodeId() == 2).findFirst().get();
+        String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, nodeRef, KafkaMetadataConfigurationState.KRAFT)
+                .withKRaft("my-cluster", "my-namespace", nodes)
                 .build();
 
         assertThat(configuration, isEquivalent("node.id=2",
@@ -113,8 +113,9 @@ public class KafkaBrokerConfigurationBuilderTest {
         );
 
         // Controller-only node
-        String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.KRAFT)
-                .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.CONTROLLER), nodes)
+        NodeRef nodeRef = nodes.stream().filter(nr -> nr.nodeId() == 2).findFirst().get();
+        String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, nodeRef, KafkaMetadataConfigurationState.KRAFT)
+                .withKRaft("my-cluster", "my-namespace", nodes)
                 .build();
 
         assertThat(configuration, isEquivalent("node.id=2",
@@ -122,10 +123,10 @@ public class KafkaBrokerConfigurationBuilderTest {
                 "controller.listener.names=CONTROLPLANE-9090",
                 "controller.quorum.voters=0@my-cluster-controllers-0.my-cluster-kafka-brokers.my-namespace.svc.cluster.local:9090,1@my-cluster-controllers-1.my-cluster-kafka-brokers.my-namespace.svc.cluster.local:9090,2@my-cluster-controllers-2.my-cluster-kafka-brokers.my-namespace.svc.cluster.local:9090"));
 
-        NodeRef nodeRef = nodes.stream().filter(nr -> nr.nodeId() == 11).findFirst().get();
+        nodeRef = nodes.stream().filter(nr -> nr.nodeId() == 11).findFirst().get();
         // Broker-only node
         configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, nodeRef, KafkaMetadataConfigurationState.KRAFT)
-                .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.BROKER), nodes)
+                .withKRaft("my-cluster", "my-namespace", nodes)
                 .build();
 
         assertThat(configuration, isEquivalent("node.id=11",
@@ -648,7 +649,7 @@ public class KafkaBrokerConfigurationBuilderTest {
     @ParallelTest
     public void testWithNoListeners() {
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, emptyList(), null, null)
+                .withListeners("my-cluster", "my-namespace", emptyList(), null, null)
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -717,7 +718,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, asList(listener1, listener2, listener3, listener4), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", asList(listener1, listener2, listener3, listener4), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -759,7 +760,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "my-cluster-kafka-2.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-cluster-kafka-2.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -802,9 +803,10 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .withTls(false)
                 .build();
 
-        String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.KRAFT)
-                .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.BROKER, ProcessRoles.CONTROLLER), nodes)
-                .withListeners("my-cluster", "my-namespace", new NodeRef("my-cluster-kafka-2", 2, "kafka", true, true), singletonList(listener), listenerId -> "my-cluster-kafka-2.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
+        NodeRef nodeRef = nodes.stream().filter(nr -> nr.nodeId() == 2).findFirst().get();
+        String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, nodeRef, KafkaMetadataConfigurationState.KRAFT)
+                .withKRaft("my-cluster", "my-namespace", nodes)
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-cluster-kafka-2.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
                 .build();
 
         assertThat(configuration, isEquivalent("node.id=2",
@@ -852,9 +854,10 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         // Controller-only node
-        String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.KRAFT)
-                .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.CONTROLLER), nodes)
-                .withListeners("my-cluster", "my-namespace", new NodeRef("my-cluster-controllers-2", 2, "controllers", true, false), singletonList(listener), listenerId -> "my-cluster-controllers-2.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
+        NodeRef nodeRef = nodes.stream().filter(nr -> nr.nodeId() == 2).findFirst().get();
+        String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, nodeRef, KafkaMetadataConfigurationState.KRAFT)
+                .withKRaft("my-cluster", "my-namespace", nodes)
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-cluster-controllers-2.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
                 .build();
 
         assertThat(configuration, isEquivalent("node.id=2",
@@ -873,11 +876,11 @@ public class KafkaBrokerConfigurationBuilderTest {
                 "sasl.enabled.mechanisms=",
                 "ssl.endpoint.identification.algorithm=HTTPS"));
 
-        NodeRef nodeRef = nodes.stream().filter(nr -> nr.nodeId() == 11).findFirst().get();
+        nodeRef = nodes.stream().filter(nr -> nr.nodeId() == 11).findFirst().get();
         // Broker-only node
         configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, nodeRef, KafkaMetadataConfigurationState.KRAFT)
-                .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.BROKER), nodes)
-                .withListeners("my-cluster", "my-namespace", new NodeRef("my-cluster-brokers-11", 11, "brokers", false, true), singletonList(listener), listenerId -> "my-cluster-brokers-11.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
+                .withKRaft("my-cluster", "my-namespace", nodes)
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-cluster-brokers-11.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
                 .build();
 
         assertThat(configuration, isEquivalent("node.id=11",
@@ -946,8 +949,8 @@ public class KafkaBrokerConfigurationBuilderTest {
         // Controller-only node
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION,
                 nodes.stream().filter(nodeRef -> nodeRef.nodeId() == 2).findFirst().get(), KafkaMetadataConfigurationState.KRAFT)
-            .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.CONTROLLER), nodes)
-            .withListeners("my-cluster", "my-namespace", new NodeRef("my-cluster-controllers-2", 2, "controllers", true, false), singletonList(listener), listenerId -> "my-cluster-controllers-2.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
+            .withKRaft("my-cluster", "my-namespace", nodes)
+            .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-cluster-controllers-2.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
             .build();
 
         assertThat(configuration, isEquivalent("node.id=2",
@@ -970,8 +973,8 @@ public class KafkaBrokerConfigurationBuilderTest {
         // Broker-only node
         configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION,
                 nodes.stream().filter(nodeRef -> nodeRef.nodeId() == 11).findFirst().get(), KafkaMetadataConfigurationState.KRAFT)
-            .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.BROKER), nodes)
-            .withListeners("my-cluster", "my-namespace", new NodeRef("my-cluster-brokers-11", 11, "brokers", false, true), singletonList(listener), listenerId -> "my-cluster-brokers-11.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
+            .withKRaft("my-cluster", "my-namespace", nodes)
+            .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-cluster-brokers-11.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
             .build();
 
         assertThat(configuration, isEquivalent("node.id=11",
@@ -1009,8 +1012,8 @@ public class KafkaBrokerConfigurationBuilderTest {
         // Mixed node
         configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION,
                 nodes.stream().filter(nodeRef -> nodeRef.nodeId() == 14).findFirst().get(), KafkaMetadataConfigurationState.KRAFT)
-            .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.BROKER, ProcessRoles.CONTROLLER), nodes)
-            .withListeners("my-cluster", "my-namespace", new NodeRef("my-cluster-kafka-14", 14, "kafka", true, true), singletonList(listener), listenerId -> "my-cluster-kafka-14.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
+            .withKRaft("my-cluster", "my-namespace", nodes)
+            .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-cluster-kafka-14.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
             .build();
 
         assertThat(configuration, isEquivalent("node.id=14",
@@ -1058,7 +1061,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1098,7 +1101,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1141,7 +1144,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1193,7 +1196,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1234,7 +1237,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1277,7 +1280,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1324,7 +1327,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1374,7 +1377,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1415,7 +1418,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
       
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1456,7 +1459,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "my-lb.com", listenerId -> "9094")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-lb.com", listenerId -> "9094")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1497,7 +1500,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1535,7 +1538,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1576,7 +1579,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1614,7 +1617,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "${STRIMZI_NODEPORT_DEFAULT_ADDRESS}", listenerId -> "31234")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "${STRIMZI_NODEPORT_DEFAULT_ADDRESS}", listenerId -> "31234")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1664,7 +1667,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1714,7 +1717,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1764,7 +1767,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1818,7 +1821,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1877,7 +1880,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1922,7 +1925,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -1977,7 +1980,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -2030,7 +2033,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -2149,7 +2152,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, containsString("listener.security.protocol.map=CONTROLPLANE-9090:SSL,REPLICATION-9091:SSL,CUSTOM-LISTENER-9092:SASL_SSL"));
@@ -2169,7 +2172,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, containsString("listener.security.protocol.map=CONTROLPLANE-9090:SSL,REPLICATION-9091:SSL,CUSTOM-LISTENER-9092:SASL_PLAINTEXT"));
@@ -2190,7 +2193,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, containsString("listener.security.protocol.map=CONTROLPLANE-9090:SSL,REPLICATION-9091:SSL,CUSTOM-LISTENER-9092:PLAINTEXT"));
@@ -2210,7 +2213,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, not(containsString("ssl.truststore.path")));
@@ -2235,7 +2238,7 @@ public class KafkaBrokerConfigurationBuilderTest {
                 .build();
 
         String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, NODE_REF, KafkaMetadataConfigurationState.ZK)
-                .withListeners("my-cluster", "my-namespace", NODE_REF, singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
+                .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "dummy-advertised-address", listenerId -> "1919")
                 .build();
 
         assertThat(configuration, isEquivalent("broker.id=2",
@@ -2290,7 +2293,7 @@ public class KafkaBrokerConfigurationBuilderTest {
 
         for (KafkaMetadataConfigurationState state : KafkaMetadataConfigurationState.values()) {
             String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, controller, state)
-                    .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.CONTROLLER), nodes)
+                    .withKRaft("my-cluster", "my-namespace", nodes)
                     .build();
             // controllers don't have broker.id at all in any migration state, only node.id, but always "controller" role
             assertThat(configuration, not(containsString("broker.id")));
@@ -2298,15 +2301,15 @@ public class KafkaBrokerConfigurationBuilderTest {
             assertThat(configuration, containsString("process.roles=controller"));
 
             configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, broker, state)
-                    .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.BROKER), nodes)
+                    .withKRaft("my-cluster", "my-namespace", nodes)
                     .build();
             // brokers have broker.id (together with node.id) but no role up to the migration step ...
-            if (state.isZooKeeperOrMigration()) {
+            if (state.isZooKeeperToMigration()) {
                 assertThat(configuration, both(containsString("broker.id=0")).and(containsString("node.id=0")));
                 assertThat(configuration, not(containsString("process.roles")));
             }
             // ... from post-migration (to KRaft) they are already in KRaft-mode, so no broker.id anymore, but "broker" role
-            if (state.isPostMigrationOrKRaft()) {
+            if (state.isPostMigrationToKRaft()) {
                 assertThat(configuration, not(containsString("broker.id")));
                 assertThat(configuration, containsString("node.id=0"));
                 assertThat(configuration, containsString("process.roles=broker"));
@@ -2329,14 +2332,14 @@ public class KafkaBrokerConfigurationBuilderTest {
 
         for (KafkaMetadataConfigurationState state : KafkaMetadataConfigurationState.values()) {
             // controllers don't make sense in ZooKeeper state, but only from pre-migration to KRaft
-            if (state.isPreMigrationOrKRaft()) {
+            if (state.isPreMigrationToKRaft()) {
                 String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, controller, state)
-                        .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.CONTROLLER), nodes)
-                        .withListeners("my-cluster", "my-namespace", controller, singletonList(listener), listenerId -> "my-cluster-controllers-1.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
+                        .withKRaft("my-cluster", "my-namespace", nodes)
+                        .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-cluster-controllers-1.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
                         .build();
 
                 // replication listener configured up to post-migration, before being full KRaft
-                if (state.isZooKeeperOrPostMigration()) {
+                if (state.isZooKeeperToPostMigration()) {
                     assertThat(configuration, containsString("listener.name.replication-9091"));
                     assertThat(configuration, containsString("listener.security.protocol.map=CONTROLPLANE-9090:SSL,REPLICATION-9091:SSL"));
                     assertThat(configuration, containsString("inter.broker.listener.name=REPLICATION-9091"));
@@ -2353,11 +2356,11 @@ public class KafkaBrokerConfigurationBuilderTest {
             }
 
             String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, broker, state)
-                    .withKRaft("my-cluster", "my-namespace", Set.of(ProcessRoles.BROKER), nodes)
-                    .withListeners("my-cluster", "my-namespace", broker, singletonList(listener), listenerId -> "my-cluster-brokers-0.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
+                    .withKRaft("my-cluster", "my-namespace", nodes)
+                    .withListeners("my-cluster", "my-namespace", singletonList(listener), listenerId -> "my-cluster-brokers-0.my-cluster-kafka-brokers.my-namespace.svc", listenerId -> "9092")
                     .build();
 
-            if (state.isZooKeeperOrMigration()) {
+            if (state.isZooKeeperToMigration()) {
                 // control plane is set as listener and advertised up to migration ...
                 assertThat(configuration, containsString("listeners=CONTROLPLANE-9090://0.0.0.0:9090,REPLICATION-9091://0.0.0.0:9091,PLAIN-9092://0.0.0.0:9092"));
                 assertThat(configuration, containsString("advertised.listeners=CONTROLPLANE-9090://my-cluster-brokers-0.my-cluster-kafka-brokers.my-namespace.svc:9090,REPLICATION-9091://my-cluster-brokers-0.my-cluster-kafka-brokers.my-namespace.svc:9091,PLAIN-9092://my-cluster-brokers-0.my-cluster-kafka-brokers.my-namespace.svc:9092"));
@@ -2383,7 +2386,7 @@ public class KafkaBrokerConfigurationBuilderTest {
 
         for (KafkaMetadataConfigurationState state : KafkaMetadataConfigurationState.values()) {
             // controllers don't make sense in ZooKeeper state, but only from pre-migration to KRaft
-            if (state.isPreMigrationOrKRaft()) {
+            if (state.isPreMigrationToKRaft()) {
                 String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, controller, state)
                         .withAuthorization("my-cluster", auth)
                         .build();
@@ -2396,7 +2399,7 @@ public class KafkaBrokerConfigurationBuilderTest {
             String configuration = new KafkaBrokerConfigurationBuilder(Reconciliation.DUMMY_RECONCILIATION, broker, state)
                     .withAuthorization("my-cluster", auth)
                     .build();
-            if (state.isPostMigrationOrKRaft()) {
+            if (state.isPostMigrationToKRaft()) {
                 assertThat(configuration, containsString("authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer"));
             } else {
                 assertThat(configuration, containsString("authorizer.class.name=kafka.security.authorizer.AclAuthorizer"));

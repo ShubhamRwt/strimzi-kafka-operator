@@ -1027,6 +1027,7 @@ public class KafkaReconciler {
         return Future.succeededFuture();
     }
 
+    // Updates the KRaft migration state into the Kafka Status instance
     protected Future<Void> updateKafkaMetadataState(KafkaStatus kafkaStatus) {
         kafkaStatus.setKafkaMetadataState(kafkaMetadataStateManager.computeNextMetadataState(kafkaStatus).name());
         return Future.succeededFuture();
@@ -1051,20 +1052,18 @@ public class KafkaReconciler {
                         // going through the controllers set to get metrics from one of them, because all expose the needed metrics
                         boolean zkMigrationStateChecked = false;
                         for (NodeRef controller : kafka.controllerNodes()) {
-                            int controllerId = controller.nodeId();
-                            String controllerPodName = kafka.nodePoolForNodeId(controllerId).nodeRef(controllerId).podName();
                             try {
-                                LOGGER.infoCr(reconciliation, "Checking ZooKeeper migration state on controller {}", controllerPodName);
+                                LOGGER.infoCr(reconciliation, "Checking ZooKeeper migration state on controller {}", controller.podName());
                                 this.kafkaMetadataStateManager.checkMigrationInProgress(
                                         reconciliation,
                                         compositeFuture.resultAt(0),
                                         compositeFuture.resultAt(1),
-                                        controllerPodName
+                                        controller.podName()
                                 );
                                 zkMigrationStateChecked = true;
                                 break;
                             } catch (RuntimeException e) {
-                                LOGGER.warnCr(reconciliation, "Error on checking ZooKeeper migration state on controller {}", controllerPodName);
+                                LOGGER.warnCr(reconciliation, "Error on checking ZooKeeper migration state on controller {}", controller.podName());
                             }
                         }
                         return zkMigrationStateChecked ? Future.succeededFuture() : Future.failedFuture(new Throwable("Impossible to check ZooKeeper migration state"));
