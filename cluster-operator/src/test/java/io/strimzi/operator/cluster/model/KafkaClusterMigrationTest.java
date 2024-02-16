@@ -98,6 +98,8 @@ public class KafkaClusterMigrationTest {
             SHARED_ENV_PROVIDER
     );
 
+    private final static KafkaVersionChange KAFKA_VERSION_CHANGE = new KafkaVersionChange(VERSIONS.defaultVersion(), VERSIONS.defaultVersion(), VERSIONS.defaultVersion().protocolVersion(), VERSIONS.defaultVersion().messageVersion(), VERSIONS.defaultVersion().metadataVersion());
+
     @Test
     public void testBrokerNodeConfigurationOnMigration() {
         Map<Integer, Map<String, String>> advertisedHostnames = Map.of(
@@ -117,7 +119,7 @@ public class KafkaClusterMigrationTest {
                     KAFKA,
                     List.of(KAFKA_POOL_CONTROLLERS, KAFKA_POOL_BROKERS),
                     VERSIONS,
-                    KafkaVersionTestUtils.DEFAULT_KRAFT_VERSION_CHANGE,
+                    KAFKA_VERSION_CHANGE,
                     state,
                     null, SHARED_ENV_PROVIDER);
 
@@ -187,7 +189,7 @@ public class KafkaClusterMigrationTest {
                         KAFKA,
                         List.of(KAFKA_POOL_CONTROLLERS, KAFKA_POOL_BROKERS),
                         VERSIONS,
-                        KafkaVersionTestUtils.DEFAULT_KRAFT_VERSION_CHANGE,
+                        KAFKA_VERSION_CHANGE,
                         state,
                         null, SHARED_ENV_PROVIDER);
 
@@ -241,7 +243,7 @@ public class KafkaClusterMigrationTest {
                     KAFKA,
                     List.of(KAFKA_POOL_CONTROLLERS, KAFKA_POOL_BROKERS),
                     VERSIONS,
-                    KafkaVersionTestUtils.DEFAULT_KRAFT_VERSION_CHANGE,
+                    KAFKA_VERSION_CHANGE,
                     state,
                     null,
                     SHARED_ENV_PROVIDER
@@ -295,7 +297,7 @@ public class KafkaClusterMigrationTest {
                     KAFKA,
                     List.of(KAFKA_POOL_CONTROLLERS, KAFKA_POOL_BROKERS),
                     VERSIONS,
-                    KafkaVersionTestUtils.DEFAULT_KRAFT_VERSION_CHANGE,
+                    KAFKA_VERSION_CHANGE,
                     state,
                     null,
                     SHARED_ENV_PROVIDER
@@ -335,7 +337,7 @@ public class KafkaClusterMigrationTest {
                     kafka,
                     List.of(KAFKA_POOL_CONTROLLERS, KAFKA_POOL_BROKERS),
                     VERSIONS,
-                    KafkaVersionTestUtils.DEFAULT_KRAFT_VERSION_CHANGE,
+                    KAFKA_VERSION_CHANGE,
                     state,
                     null, SHARED_ENV_PROVIDER);
 
@@ -378,7 +380,7 @@ public class KafkaClusterMigrationTest {
                         kafka,
                         List.of(KAFKA_POOL_CONTROLLERS, KAFKA_POOL_BROKERS),
                         VERSIONS,
-                        KafkaVersionTestUtils.DEFAULT_KRAFT_VERSION_CHANGE,
+                        KAFKA_VERSION_CHANGE,
                         state,
                         null, SHARED_ENV_PROVIDER);
 
