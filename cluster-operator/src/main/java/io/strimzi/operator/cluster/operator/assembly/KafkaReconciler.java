@@ -59,7 +59,6 @@ import io.strimzi.operator.common.model.ClientsCa;
 import io.strimzi.operator.common.model.Labels;
 import io.strimzi.operator.common.model.NodeUtils;
 import io.strimzi.operator.common.model.StatusDiff;
-import io.strimzi.operator.common.model.StatusUtils;
 import io.strimzi.operator.common.operator.resource.ClusterRoleBindingOperator;
 import io.strimzi.operator.common.operator.resource.ConfigMapOperator;
 import io.strimzi.operator.common.operator.resource.CrdOperator;
@@ -80,7 +79,6 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.common.KafkaException;
-import org.apache.kafka.server.common.MetadataVersion;
 
 import java.time.Clock;
 import java.util.ArrayList;
@@ -237,7 +235,6 @@ public class KafkaReconciler {
      */
     public Future<Void> reconcile(KafkaStatus kafkaStatus, Clock clock)    {
         return modelWarnings(kafkaStatus)
-                .compose(i -> validateVersionsForKRaftMigration(kafkaStatus))
                 .compose(i -> manualPodCleaning())
                 .compose(i -> networkPolicy())
                 .compose(i -> manualRollingUpdate())
@@ -1028,7 +1025,7 @@ public class KafkaReconciler {
     }
 
     // Updates the KRaft migration state into the Kafka Status instance
-    protected Future<Void> updateKafkaMetadataState(KafkaStatus kafkaStatus) {
+    /* test */ Future<Void> updateKafkaMetadataState(KafkaStatus kafkaStatus) {
         kafkaStatus.setKafkaMetadataState(kafkaMetadataStateManager.computeNextMetadataState(kafkaStatus).name());
         return Future.succeededFuture();
     }
@@ -1122,44 +1119,5 @@ public class KafkaReconciler {
         } else {
             return Future.succeededFuture();
         }
-    }
-
-    /**
-     * Validate the Kafka version set in the Kafka custom resource, together with the metadata version and the configured
-     * inter.broker.protocol.version and log.message.format.version.
-     * They need to be all aligned and at least 3.4 to support ZooKeeper to KRaft migration.
-     *
-     * @param kafkaStatus Status of the Kafka custom resource where warnings about any issues with metadata state will be added
-     *
-     * @return Future which completes when validation is done
-     */
-    Future<Void> validateVersionsForKRaftMigration(KafkaStatus kafkaStatus) {
-        KafkaMetadataConfigurationState kafkaMetadataConfigState = kafkaMetadataStateManager.getMetadataConfigurationState();
-        if (kafkaMetadataConfigState.isPreMigration()) {
-            // validate 3.4 <= kafka.version && metadataVersion/IBP/LMF == kafka.version
-
-            MetadataVersion kafkaVersion = MetadataVersion.fromVersionString(kafka.getKafkaVersion().version());
-            // this should check that spec.kafka.version is >= 3.4
-            boolean isMigrationSupported = kafkaVersion.isMigrationSupported();
-
-            MetadataVersion metadataVersion = MetadataVersion.fromVersionString(kafka.getMetadataVersion());
-            MetadataVersion interBrokerProtocolVersion = MetadataVersion.fromVersionString(kafka.getInterBrokerProtocolVersion());
-            MetadataVersion logMessageFormatVersion = MetadataVersion.fromVersionString(kafka.getLogMessageFormatVersion());
-
-            if (!isMigrationSupported ||
-                    metadataVersion.compareTo(interBrokerProtocolVersion) != 0 ||
-                    metadataVersion.compareTo(logMessageFormatVersion) != 0) {
-                // set warning condition on Kafka CR status that cluster metadata version, inter.broker.protocol.version and/or log.message.format.version need to be fixed
-                kafkaStatus.addCondition(StatusUtils.buildWarningCondition("KafkaMetadataStateWarning",
-                        "Migration cannot be performed. Please make sure Kafka version is higher than 3.4 and " +
-                                "metadata version, inter.broker.protocol.version and log.message.format.version set to the same value."));
-                LOGGER.errorCr(reconciliation,
-                        "Migration cannot be performed with Kafka version {}, metadata version {}, inter.broker.protocol.version {}, log.message.format.version {}",
-                        kafkaVersion, metadataVersion, interBrokerProtocolVersion, logMessageFormatVersion);
-                throw new IllegalArgumentException("Migration cannot be performed. Please make sure Kafka version is higher than 3.4 and having " +
-                        "metadata version, inter.broker.protocol.version and log.message.format.version set to the same value as well.");
-            }
-        }
-        return Future.succeededFuture();
     }
 }

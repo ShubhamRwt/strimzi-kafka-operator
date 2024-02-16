@@ -346,6 +346,14 @@ public class KafkaCluster extends AbstractModel implements SupportsMetrics, Supp
             result.configuration.setConfigOption(KafkaConfiguration.LOG_MESSAGE_FORMAT_VERSION, versionChange.logMessageFormatVersion());
         }
 
+        // validating if the KRaft migration is possible based on Kafka version, metadata version, inter broker protocol and log message format
+        if (kafkaMetadataConfigState.isPreMigration()) {
+            KRaftUtils.validateVersionsForKRaftMigration(
+                    result.getKafkaVersion().version(), result.getMetadataVersion(),
+                    result.getInterBrokerProtocolVersion(), result.getLogMessageFormatVersion()
+            );
+        }
+
         result.ccMetricsReporter = CruiseControlMetricsReporter.fromCrd(kafka, configuration, numberOfBrokers);
 
         // Configure listeners

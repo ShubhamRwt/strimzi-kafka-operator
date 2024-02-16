@@ -117,6 +117,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasProperty;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SuppressWarnings({"checkstyle:ClassDataAbstractionCoupling", "checkstyle:ClassFanOutComplexity", "checkstyle:JavaNCSS"})
@@ -3981,5 +3982,98 @@ public class KafkaClusterTest {
         }, this.getClass().getSimpleName() + ".withTolerations");
 
         resourceTester.assertDesiredResource(".yaml", cr -> cr.getSpec().getKafka().getTemplate().getPod().getTolerations());
+    }
+
+    @ParallelTest
+    public void testInvalidInterBrokerProtocolAndLogMessageFormatOnKRaftMigration() {
+        // invalid values ... metadata missing (it gets the Kafka version), inter broker protocol and log message format lower than Kafka version
+        Map<String, Object> config = new HashMap<>();
+        config.put("inter.broker.protocol.version", "3.5");
+        config.put("log.message.format.version", "3.5");
+
+        Kafka kafka = new KafkaBuilder(KAFKA)
+                .editSpec()
+                    .editKafka()
+                        .withVersion("3.6.1")
+                        .withConfig(config)
+                    .endKafka()
+                .endSpec()
+                .build();
+
+        InvalidResourceException ex = assertThrows(InvalidResourceException.class, () -> {
+            List<KafkaPool> pools = NodePoolUtils.createKafkaPools(Reconciliation.DUMMY_RECONCILIATION, kafka, null, Map.of(), Map.of(), false, SHARED_ENV_PROVIDER);
+
+            KafkaVersion kafkaVersion = VERSIONS.supportedVersion(kafka.getSpec().getKafka().getVersion());
+            KafkaVersionChange kafkaVersionChange = new KafkaVersionChange(
+                    kafkaVersion,
+                    kafkaVersion,
+                    VERSIONS.version("3.5.0").protocolVersion(),
+                    VERSIONS.version("3.5.0").messageVersion(),
+                    // as per ZooKeeperVersionChangeCreator, when migration, we set missing metadata version to the Kafka version
+                    kafkaVersion.metadataVersion());
+            KafkaCluster.fromCrd(Reconciliation.DUMMY_RECONCILIATION, kafka, pools, VERSIONS, kafkaVersionChange, KafkaMetadataConfigurationState.PRE_MIGRATION, null, SHARED_ENV_PROVIDER);
+        });
+
+        assertThat(ex.getMessage(), containsString("Migration cannot be performed with Kafka version 3.6-IV2, metadata version 3.6-IV2, inter.broker.protocol.version 3.5-IV2, log.message.format.version 3.5-IV2."));
+    }
+
+    @ParallelTest
+    public void testInvalidMetadataVersionOnKRaftMigration() {
+        // invalid values ... metadata lower than Kafka version, inter broker protocol and log message format missing (they get the Kafka version)
+        Kafka kafka = new KafkaBuilder(KAFKA)
+                .editSpec()
+                    .editKafka()
+                        .withVersion("3.6.1")
+                        .withMetadataVersion("3.5-IV2")
+                        .withConfig(Map.of())
+                    .endKafka()
+                .endSpec()
+                .build();
+
+        InvalidResourceException ex = assertThrows(InvalidResourceException.class, () -> {
+            List<KafkaPool> pools = NodePoolUtils.createKafkaPools(Reconciliation.DUMMY_RECONCILIATION, kafka, null, Map.of(), Map.of(), false, SHARED_ENV_PROVIDER);
+
+            KafkaVersion kafkaVersion = VERSIONS.supportedVersion(kafka.getSpec().getKafka().getVersion());
+            KafkaVersionChange kafkaVersionChange = new KafkaVersionChange(
+                    kafkaVersion,
+                    kafkaVersion,
+                    // as per ZooKeeperVersionChangeCreator, we set missing inter broker protocol and log message format to the Kafka version
+                    kafkaVersion.protocolVersion(),
+                    kafkaVersion.messageVersion(),
+                    kafka.getSpec().getKafka().getMetadataVersion());
+            KafkaCluster.fromCrd(Reconciliation.DUMMY_RECONCILIATION, kafka, pools, VERSIONS, kafkaVersionChange, KafkaMetadataConfigurationState.PRE_MIGRATION, null, SHARED_ENV_PROVIDER);
+        });
+
+        assertThat(ex.getMessage(), containsString("Migration cannot be performed with Kafka version 3.6-IV2, metadata version 3.5-IV2, inter.broker.protocol.version 3.6-IV2, log.message.format.version 3.6-IV2."));
+    }
+
+    @ParallelTest
+    public void testValidVersionsOnKRaftMigration() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("inter.broker.protocol.version", "3.6");
+        config.put("log.message.format.version", "3.6");
+
+        Kafka kafka = new KafkaBuilder(KAFKA)
+                .editSpec()
+                    .editKafka()
+                        .withVersion("3.6.1")
+                        .withMetadataVersion("3.6-IV2")
+                        .withConfig(config)
+                .endKafka()
+                .endSpec()
+                .build();
+
+        assertDoesNotThrow(() -> {
+            List<KafkaPool> pools = NodePoolUtils.createKafkaPools(Reconciliation.DUMMY_RECONCILIATION, kafka, null, Map.of(), Map.of(), false, SHARED_ENV_PROVIDER);
+
+            KafkaVersion kafkaVersion = VERSIONS.supportedVersion(kafka.getSpec().getKafka().getVersion());
+            KafkaVersionChange kafkaVersionChange = new KafkaVersionChange(
+                    kafkaVersion,
+                    kafkaVersion,
+                    kafkaVersion.protocolVersion(),
+                    kafkaVersion.messageVersion(),
+                    kafka.getSpec().getKafka().getMetadataVersion());
+            KafkaCluster.fromCrd(Reconciliation.DUMMY_RECONCILIATION, kafka, pools, VERSIONS, kafkaVersionChange, KafkaMetadataConfigurationState.PRE_MIGRATION, null, SHARED_ENV_PROVIDER);
+        });
     }
 }
