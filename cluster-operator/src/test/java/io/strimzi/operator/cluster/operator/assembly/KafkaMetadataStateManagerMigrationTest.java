@@ -28,6 +28,7 @@ import io.strimzi.operator.cluster.model.KafkaCluster;
 import io.strimzi.operator.cluster.model.KafkaMetadataConfigurationState;
 import io.strimzi.operator.cluster.model.KafkaPool;
 import io.strimzi.operator.cluster.model.KafkaVersion;
+import io.strimzi.operator.cluster.model.KafkaVersionChange;
 import io.strimzi.operator.cluster.model.MockSharedEnvironmentProvider;
 import io.strimzi.operator.cluster.model.SharedEnvironmentProvider;
 import io.strimzi.operator.cluster.model.nodepools.NodePoolUtils;
@@ -132,13 +133,21 @@ public class KafkaMetadataStateManagerMigrationTest {
             .build();
 
     private static KafkaCluster createKafkaCluster(Reconciliation reconciliation, Kafka kafka, KafkaMetadataConfigurationState state)   {
+        KafkaVersion kafkaVersion = VERSIONS.supportedVersion(kafka.getSpec().getKafka().getVersion());
+        KafkaVersionChange kafkaVersionChange = new KafkaVersionChange(
+                kafkaVersion,
+                kafkaVersion,
+                kafkaVersion.protocolVersion(),
+                kafkaVersion.messageVersion(),
+                // as per ZooKeeperVersionChangeCreator, when migration, we set missing metadata version to the Kafka version
+                kafkaVersion.metadataVersion());
         List<KafkaPool> pools = NodePoolUtils.createKafkaPools(reconciliation, kafka, List.of(CONTROLLERS, BROKERS), Map.of(), Map.of(), true, SHARED_ENV_PROVIDER);
         return KafkaCluster.fromCrd(
                 reconciliation,
                 kafka,
                 pools,
                 VERSIONS,
-                KafkaVersionTestUtils.DEFAULT_ZOOKEEPER_VERSION_CHANGE,
+                kafkaVersionChange,
                 state,
                 null,
                 SHARED_ENV_PROVIDER);
