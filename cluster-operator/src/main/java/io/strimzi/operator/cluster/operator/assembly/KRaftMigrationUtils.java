@@ -6,6 +6,8 @@
 package io.strimzi.operator.cluster.operator.assembly;
 
 import io.fabric8.kubernetes.api.model.Secret;
+import io.strimzi.operator.cluster.operator.resource.KRaftMigrationState;
+import io.strimzi.operator.cluster.operator.resource.KafkaAgentClient;
 import io.strimzi.operator.common.Reconciliation;
 import io.strimzi.operator.common.ReconciliationLogger;
 import io.strimzi.operator.common.Util;
@@ -69,6 +71,52 @@ public class KRaftMigrationUtils {
         }
     }
 
+    /**
+     * Check for the status of the Kafka metadata migration
+     *
+     * @param reconciliation    Reconciliation information
+     * @param clusterCaCertSecret   Secret with the Cluster CA public key
+     * @param coKeySecret   Secret with the Cluster CA private key
+     * @param controllerPodName Name of the quorum controller leader pod
+     *
+     * @return true if the migration is done, false otherwise
+     */
+    public static boolean checkMigrationInProgress(Reconciliation reconciliation, Secret clusterCaCertSecret, Secret coKeySecret, String controllerPodName) {
+        KafkaAgentClient kafkaAgentClient = initKafkaAgentClient(reconciliation, clusterCaCertSecret, coKeySecret);
+        KRaftMigrationState kraftMigrationState = kafkaAgentClient.getKRaftMigrationState(controllerPodName);
+        LOGGER.infoCr(reconciliation, "ZooKeeper to KRaft migration state {} checked on controller {}", kraftMigrationState.state(), controllerPodName);
+        if (kraftMigrationState.state() == -1) {
+            throw new RuntimeException("Failed to get the ZooKeeper to KRaft migration state");
+        }
+        return kraftMigrationState.isMigrationDone();
+    }
+
+    /**
+     * Creates the KafkaAgentClient instance
+     *
+     * @param reconciliation    Reconciliation information
+     * @param clusterCaCertSecret   Secret with the Cluster CA public key
+     * @param coKeySecret   Secret with the Cluster CA private key
+     *
+     * @return KafkaAgentClient instance
+     */
+    private static KafkaAgentClient initKafkaAgentClient(Reconciliation reconciliation, Secret clusterCaCertSecret, Secret coKeySecret)  {
+        return new KafkaAgentClient(reconciliation, reconciliation.name(), reconciliation.namespace(), clusterCaCertSecret, coKeySecret);
+    }
+
+    /**
+     * Create a ZooKeeperAdmin client instance to interact with the ZooKeeper ensamble for migration rollback purposes
+     *
+     * @param reconciliation    Reconciliation information
+     * @param zkConnectionString    Connection information to ZooKeeper
+     * @param operationTimeoutMs    Timeout for ZooKeeper requests
+     * @param trustStoreFile    File hosting the truststore with TLS certificates to use to connect to ZooKeeper
+     * @param trustStorePassword    Password for accessing the truststore
+     * @param keyStoreFile  File hosting the keystore with TLS private keys to use to connect to ZooKeeper
+     * @param keyStorePassword  Password for accessing the keystore
+     * @return  A ZooKeeperAdmin instance
+     * @throws IOException
+     */
     private static ZooKeeperAdmin createZooKeeperAdminClient(Reconciliation reconciliation, String zkConnectionString, long operationTimeoutMs,
                                                              File trustStoreFile, String trustStorePassword, File keyStoreFile, String keyStorePassword) throws IOException {
         ZKClientConfig clientConfig = new ZKClientConfig();
@@ -84,12 +132,10 @@ public class KRaftMigrationUtils {
         clientConfig.setProperty("zookeeper.ssl.keyStore.type", "PKCS12");
         clientConfig.setProperty("zookeeper.request.timeout", String.valueOf(operationTimeoutMs));
 
-        ZooKeeperAdmin admin = new ZooKeeperAdmin(
+        return new ZooKeeperAdmin(
                 zkConnectionString,
                 10000,
                 watchedEvent -> LOGGER.debugCr(reconciliation, "Received event {} from ZooKeeperAdmin client connected to {}", watchedEvent, zkConnectionString),
                 clientConfig);
-
-        return admin;
     }
 }

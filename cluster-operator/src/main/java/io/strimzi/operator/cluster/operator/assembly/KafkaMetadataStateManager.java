@@ -4,13 +4,10 @@
  */
 package io.strimzi.operator.cluster.operator.assembly;
 
-import io.fabric8.kubernetes.api.model.Secret;
 import io.strimzi.api.kafka.model.kafka.Kafka;
 import io.strimzi.api.kafka.model.kafka.KafkaMetadataState;
 import io.strimzi.api.kafka.model.kafka.KafkaStatus;
 import io.strimzi.operator.cluster.model.KafkaMetadataConfigurationState;
-import io.strimzi.operator.cluster.operator.resource.KRaftMigrationState;
-import io.strimzi.operator.cluster.operator.resource.KafkaAgentClient;
 import io.strimzi.operator.common.Annotations;
 import io.strimzi.operator.common.Reconciliation;
 import io.strimzi.operator.common.ReconciliationLogger;
@@ -160,37 +157,6 @@ public class KafkaMetadataStateManager {
         }
         // this should never happen
         throw new IllegalArgumentException("Invalid internal Kafka metadata state [" + this.metadataState + "] with strimzi.io/kraft annotation [" + this.kraftAnno + "]");
-    }
-
-    /**
-     * Check for the status of the Kafka metadata migration
-     *
-     * @param reconciliation    Reconciliation information
-     * @param clusterCaCertSecret   Secret with the Cluster CA public key
-     * @param coKeySecret   Secret with the Cluster CA private key
-     * @param controllerPodName Name of the quorum controller leader pod
-     */
-    public void checkMigrationInProgress(Reconciliation reconciliation, Secret clusterCaCertSecret, Secret coKeySecret, String controllerPodName) {
-        KafkaAgentClient kafkaAgentClient = initKafkaAgentClient(reconciliation, clusterCaCertSecret, coKeySecret);
-        KRaftMigrationState kraftMigrationState = kafkaAgentClient.getKRaftMigrationState(controllerPodName);
-        LOGGER.infoCr(reconciliation, "ZooKeeper to KRaft migration state {} checked on controller {}", kraftMigrationState.state(), controllerPodName);
-        if (kraftMigrationState.state() == -1) {
-            throw new RuntimeException("Failed to get the ZooKeeper to KRaft migration state");
-        }
-        this.isMigrationDone = kraftMigrationState.isMigrationDone();
-    }
-
-    /**
-     * Creates the KafkaAgentClient instance
-     *
-     * @param reconciliation    Reconciliation information
-     * @param clusterCaCertSecret   Secret with the Cluster CA public key
-     * @param coKeySecret   Secret with the Cluster CA private key
-     *
-     * @return KafkaAgentClient instance
-     */
-    /* test */ protected KafkaAgentClient initKafkaAgentClient(Reconciliation reconciliation, Secret clusterCaCertSecret, Secret coKeySecret)  {
-        return new KafkaAgentClient(reconciliation, reconciliation.name(), reconciliation.namespace(), clusterCaCertSecret, coKeySecret);
     }
 
     /**
@@ -361,6 +327,15 @@ public class KafkaMetadataStateManager {
      */
     private boolean isMigrationDone() {
         return this.isMigrationDone;
+    }
+
+    /**
+     * Set if the migration was done or not
+     *
+     * @param migrationDone if the migration was done or not
+     */
+    public void setMigrationDone(boolean migrationDone) {
+        isMigrationDone = migrationDone;
     }
 
     /**

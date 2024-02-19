@@ -1051,12 +1051,13 @@ public class KafkaReconciler {
                         for (NodeRef controller : kafka.controllerNodes()) {
                             try {
                                 LOGGER.infoCr(reconciliation, "Checking ZooKeeper migration state on controller {}", controller.podName());
-                                this.kafkaMetadataStateManager.checkMigrationInProgress(
-                                        reconciliation,
-                                        compositeFuture.resultAt(0),
-                                        compositeFuture.resultAt(1),
-                                        controller.podName()
-                                );
+                                this.kafkaMetadataStateManager.setMigrationDone(
+                                        KRaftMigrationUtils.checkMigrationInProgress(
+                                                reconciliation,
+                                                compositeFuture.resultAt(0),
+                                                compositeFuture.resultAt(1),
+                                                controller.podName()
+                                        ));
                                 zkMigrationStateChecked = true;
                                 break;
                             } catch (RuntimeException e) {
