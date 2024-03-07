@@ -20,12 +20,10 @@ import io.strimzi.operator.common.UncheckedInterruptedException;
 import io.strimzi.operator.common.operator.resource.PodOperator;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import io.vertx.core.Vertx;
 import org.apache.kafka.clients.admin.ConfigEntry;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.admin.TopicListing;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -36,6 +34,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -881,30 +881,43 @@ public class RackRolling {
         this.allowReconfiguration = allowReconfiguration;
     }
 
-    private final ScheduledExecutorService singleExecutor = Executors.newSingleThreadScheduledExecutor(
-            runnable -> new Thread(runnable, "kafka-roller"));
+    private final ScheduledExecutorService
 
     /**  Runs the roller via single thread Executor
      *
      * @return a future based on the rolling outcome.
      */
-    public Future<Void> executeRolling() {
-        Promise<Void> result = Promise.promise();
-        singleExecutor.submit(() -> {
-            List<Integer> nodesToRestart;
-            try {
-                do {
-                    nodesToRestart = loop();
-                } while (!nodesToRestart.isEmpty());
-                result.complete();
-            } catch (Exception e) {
-                LOGGER.debugCr(reconciliation, "Something went wrong when trying to do a rolling restart", e);
-                singleExecutor.shutdown();
-                result.fail(e);
-            }
-        });
+    public Future<Void> executeRollingAsync(
+            Vertx vertx) {
 
+        Promise<Void> result = Promise.promise();
+        var singleExecutor = Executors.newSingleThreadScheduledExecutor(
+                runnable -> new Thread(runnable, "kafka-roller"));
+        try {
+            singleExecutor.submit(() -> {
+                try {
+                    executeRolling();
+                    vertx.runOnContext(ig -> {
+                        result.complete();
+                    });
+                } catch (Exception e) {
+                    LOGGER.debugCr(reconciliation, "Something went wrong when trying to do a rolling restart", e);
+                    vertx.runOnContext(ig -> {
+                        result.fail(e);
+                    });
+                }
+            });
+        } finally {
+            singleExecutor.shutdown();
+        }
         return result.future();
+    }
+
+    private void executeRolling() throws TimeoutException, InterruptedException, ExecutionException {
+        List<Integer> nodesToRestart;
+        do {
+            nodesToRestart = loop();
+        } while (!nodesToRestart.isEmpty());
     }
 
     /**
