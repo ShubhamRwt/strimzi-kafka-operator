@@ -287,15 +287,15 @@ public class CruiseControlApiImpl implements CruiseControlApi {
     }
 
     @Override
-    public Future<CruiseControlRebalanceResponse> removeBrokerDisksData(Reconciliation reconciliation, String host, int port, RemoveDisksOptions options, String userTaskId) {
+    public Future<CruiseControlRebalanceResponse> removeBroker(Reconciliation reconciliation, String host, int port, RemoveBrokerOptions options, String userTaskId) {
         if (options == null && userTaskId == null) {
             return Future.failedFuture(
                     new IllegalArgumentException("Either remove broker options or user task ID should be supplied, both were null"));
         }
 
-        String path = new PathBuilder(CruiseControlEndpoints.REMOVE_DISKS)
+        String path = new PathBuilder(CruiseControlEndpoints.REMOVE_BROKER)
                 .withParameter(CruiseControlParameters.JSON, "true")
-                .withRemoveBrokerDisksParameters(options)
+                .withRemoveBrokerParameters(options)
                 .build();
 
         HttpClientOptions httpOptions = getHttpClientOptions();
@@ -307,15 +307,15 @@ public class CruiseControlApiImpl implements CruiseControlApi {
     }
 
     @Override
-    public Future<CruiseControlRebalanceResponse> removeBroker(Reconciliation reconciliation, String host, int port, RemoveBrokerOptions options, String userTaskId) {
+    public Future<CruiseControlRebalanceResponse> removeBrokerDisksData(Reconciliation reconciliation, String host, int port, RemoveDisksOptions options, String userTaskId) {
         if (options == null && userTaskId == null) {
             return Future.failedFuture(
-                    new IllegalArgumentException("Either remove broker options or user task ID should be supplied, both were null"));
+                    new IllegalArgumentException("Either remove disks options or user task ID should be supplied, both were null"));
         }
 
-        String path = new PathBuilder(CruiseControlEndpoints.REMOVE_BROKER)
+        String path = new PathBuilder(CruiseControlEndpoints.REMOVE_DISKS)
                 .withParameter(CruiseControlParameters.JSON, "true")
-                .withRemoveBrokerParameters(options)
+                .withRemoveBrokerDisksParameters(options)
                 .build();
 
         HttpClientOptions httpOptions = getHttpClientOptions();
@@ -390,9 +390,12 @@ public class CruiseControlApiImpl implements CruiseControlApi {
                                                 statusJson.put(CruiseControlRebalanceKeys.SUMMARY.getKey(),
                                                         originalResponse.getJsonObject(CruiseControlRebalanceKeys.SUMMARY.getKey()));
                                                 // Extract the load before/after information for the brokers
-                                                statusJson.put(
-                                                        CruiseControlRebalanceKeys.LOAD_BEFORE_OPTIMIZATION.getKey(),
-                                                        originalResponse.getJsonObject(CruiseControlRebalanceKeys.LOAD_BEFORE_OPTIMIZATION.getKey()));
+                                                JsonObject jsonObject = originalResponse.getJsonObject(CruiseControlRebalanceKeys.LOAD_BEFORE_OPTIMIZATION.getKey());
+                                                if (jsonObject != null) {
+                                                    statusJson.put(
+                                                            CruiseControlRebalanceKeys.LOAD_BEFORE_OPTIMIZATION.getKey(),
+                                                            originalResponse.getJsonObject(CruiseControlRebalanceKeys.LOAD_BEFORE_OPTIMIZATION.getKey()));
+                                                }
                                                 statusJson.put(
                                                         CruiseControlRebalanceKeys.LOAD_AFTER_OPTIMIZATION.getKey(),
                                                         originalResponse.getJsonObject(CruiseControlRebalanceKeys.LOAD_AFTER_OPTIMIZATION.getKey()));
