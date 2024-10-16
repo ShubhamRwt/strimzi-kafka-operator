@@ -53,7 +53,8 @@ public class KafkaRebalanceSpec extends Spec {
             "If not specified, the `full` mode is used by default. \n\n" +
             "* `full` mode runs the rebalancing across all the brokers in the cluster.\n" +
             "* `add-brokers` mode can be used after scaling up the cluster to move some replicas to the newly added brokers.\n" +
-            "* `remove-brokers` mode can be used before scaling down the cluster to move replicas out of the brokers to be removed.\n")
+            "* `remove-brokers` mode can be used before scaling down the cluster to move replicas out of the brokers to be removed.\n" +
+            "* `remove-disks` mode can be used to move data across the volumes within the same broker\n")
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public KafkaRebalanceMode getMode() {
         return mode;
@@ -169,7 +170,7 @@ public class KafkaRebalanceSpec extends Spec {
         this.replicaMovementStrategies = replicaMovementStrategies;
     }
 
-    @Description("List of the brokers and the volumes corresponding to them whose replicas need to be moved")
+    @Description("List of brokers and their corresponding volumes from which replicas need to be moved.")
     @MinimumItems(1)
     public List<BrokerAndVolumeIds> getMoveReplicasOffVolumes() {
         return moveReplicasOffVolumes;

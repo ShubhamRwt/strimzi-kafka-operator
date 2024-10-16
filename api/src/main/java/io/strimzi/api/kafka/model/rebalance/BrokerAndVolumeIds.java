@@ -36,7 +36,7 @@ public class BrokerAndVolumeIds implements UnknownPropertyPreserving {
     private List<Integer> volumeIds;
     private Map<String, Object> additionalProperties;
 
-    @Description("ID's of the broker which contains the disk from which you want to move the the partition replicas from")
+    @Description("ID of the broker that contains the disk from which you want to move the partition replicas.")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonProperty("brokerId")
     public Integer getBrokerId() {
@@ -47,7 +47,7 @@ public class BrokerAndVolumeIds implements UnknownPropertyPreserving {
         this.brokerId = brokerId;
     }
 
-    @Description("ID's of the disk from which the partition replicas need to be moved")
+    @Description("IDs of the disks from which the partition replicas need to be moved.")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonProperty("volumeIds")
     @MinimumItems(1)
