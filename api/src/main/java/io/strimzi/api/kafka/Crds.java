@@ -14,6 +14,8 @@ import io.fabric8.kubernetes.client.CustomResource;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.dsl.MixedOperation;
 import io.fabric8.kubernetes.client.dsl.Resource;
+import io.strimzi.api.kafka.model.anomaly.Anomaly;
+import io.strimzi.api.kafka.model.anomaly.AnomalyList;
 import io.strimzi.api.kafka.model.bridge.KafkaBridge;
 import io.strimzi.api.kafka.model.bridge.KafkaBridgeList;
 import io.strimzi.api.kafka.model.connect.KafkaConnect;
@@ -71,7 +73,6 @@ public class Crds {
         String scope, plural, singular, group, kind, listKind;
         List<String> versions;
         CustomResourceSubresourceStatus status = null;
-
         if (cls.equals(Kafka.class)) {
             scope = Kafka.SCOPE;
             plural = Kafka.RESOURCE_PLURAL;
@@ -169,6 +170,15 @@ public class Crds {
             kind = KafkaNodePool.RESOURCE_KIND;
             listKind = KafkaNodePool.RESOURCE_LIST_KIND;
             versions = KafkaNodePool.VERSIONS;
+            status = new CustomResourceSubresourceStatus();
+        } else if (cls.equals(Anomaly.class)) {
+            scope = Anomaly.SCOPE;
+            plural = Anomaly.RESOURCE_PLURAL;
+            singular = Anomaly.RESOURCE_SINGULAR;
+            group = Anomaly.RESOURCE_GROUP;
+            kind = Anomaly.RESOURCE_KIND;
+            listKind = Anomaly.RESOURCE_LIST_KIND;
+            versions = Anomaly.VERSIONS;
             status = new CustomResourceSubresourceStatus();
         } else {
             throw new RuntimeException();
@@ -288,6 +298,14 @@ public class Crds {
 
     public static MixedOperation<StrimziPodSet, StrimziPodSetList, Resource<StrimziPodSet>> strimziPodSetOperation(KubernetesClient client) {
         return client.resources(StrimziPodSet.class, StrimziPodSetList.class);
+    }
+
+    public static CustomResourceDefinition anomaly() {
+        return crd(Anomaly.class);
+    }
+
+    public static MixedOperation<Anomaly, AnomalyList, Resource<Anomaly>> anomalyOperation(KubernetesClient client) {
+        return client.resources(Anomaly.class, AnomalyList.class);
     }
 
     public static CustomResourceDefinition kafkaNodePool() {

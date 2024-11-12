@@ -94,6 +94,7 @@ COPY tmp/thirdparty-libs-${THIRD_PARTY_LIBS}/ ${KAFKA_HOME}/libs/
 ENV CRUISE_CONTROL_HOME=/opt/cruise-control
 RUN mkdir $CRUISE_CONTROL_HOME
 COPY tmp/cc/ ${CRUISE_CONTROL_HOME}/libs/
+COPY ./tmp/strimzi-notifier-${STRIMZI_VERSION}.jar ${CRUISE_CONTROL_HOME}/libs/
 COPY ./cruise-control-scripts $CRUISE_CONTROL_HOME
 
 WORKDIR $KAFKA_HOME

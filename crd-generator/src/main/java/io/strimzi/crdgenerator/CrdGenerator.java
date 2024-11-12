@@ -1232,7 +1232,9 @@ class CrdGenerator {
                             throw new RuntimeException("Unsupported command line option " + arg);
                     }
                 } else {
+                    System.out.println(arg);
                     String className = arg.substring(0, arg.indexOf('='));
+                    System.out.println(className + "hi");
                     String fileName = arg.substring(arg.indexOf('=') + 1).replace("/", File.separator);
                     Class<?> cls = Class.forName(className);
                     if (!CustomResource.class.equals(cls)

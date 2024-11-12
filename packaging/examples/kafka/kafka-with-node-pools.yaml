@@ -15,6 +15,14 @@ spec:
         type: persistent-claim
         size: 100Gi
         deleteClaim: false
+      - id: 1
+        type: persistent-claim
+        size: 100Gi
+        deleteClaim: false
+      - id: 2
+        type: persistent-claim
+        size: 100Gi
+        deleteClaim: false
 ---
 
 apiVersion: kafka.strimzi.io/v1beta2
@@ -31,6 +39,10 @@ spec:
     type: jbod
     volumes:
       - id: 0
+        type: persistent-claim
+        size: 200Gi
+        deleteClaim: false
+      - id: 1
         type: persistent-claim
         size: 200Gi
         deleteClaim: false
@@ -70,3 +82,5 @@ spec:
   entityOperator:
     topicOperator: {}
     userOperator: {}
+  cruiseControl: {}
+

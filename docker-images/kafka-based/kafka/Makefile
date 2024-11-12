@@ -6,6 +6,7 @@ include ../../../Makefile.docker
 kafka_agent_dist := ../../artifacts/binaries/kafka-agent-$(RELEASE_VERSION)-dist.zip
 mirror_maker_agent_dist := ../../artifacts/binaries/mirror-maker-agent-$(RELEASE_VERSION)-dist.zip
 tracing_agent_dist := ../../artifacts/binaries/tracing-agent-$(RELEASE_VERSION)-dist.zip
+strimzi_notifier_dist := ../../artifacts/binaries/strimzi-notifier-$(RELEASE_VERSION)-dist.zip
 
 clean:
 	rm -rf tmp
@@ -29,6 +30,12 @@ clean:
 	mv tmp/io.strimzi.tracing-agent-$(RELEASE_VERSION).jar tmp/tracing-agent-$(RELEASE_VERSION).jar
 	touch .tracing-agent.tmp
 
+.strimzi-notifier.tmp: $(strimzi_notifier_dist)
+	test -d tmp || mkdir tmp
+	unzip -qoj $(strimzi_notifier_dist) lib/io.strimzi.strimzi-notifier-$(RELEASE_VERSION).jar -d tmp/
+	mv tmp/io.strimzi.strimzi-notifier-$(RELEASE_VERSION).jar tmp/strimzi-notifier-$(RELEASE_VERSION).jar
+	touch .strimzi-notifier.tmp
+
 .thirdparty-libs-$(THIRD_PARTY_LIBS).tmp: ../../artifacts/binaries/kafka-thirdparty-libs/$(THIRD_PARTY_LIBS).zip
 	test -d tmp/thirdparty-libs-$(THIRD_PARTY_LIBS) || mkdir -p tmp/thirdparty-libs-$(THIRD_PARTY_LIBS)
 	unzip -qoj ../../artifacts/binaries/kafka-thirdparty-libs/$(THIRD_PARTY_LIBS).zip -d tmp/thirdparty-libs-$(THIRD_PARTY_LIBS)
@@ -49,7 +56,7 @@ clean:
 	cp ../../artifacts/binaries/kafka/$(KAFKA_VERSION).ignorelist tmp/$(KAFKA_VERSION).ignorelist
 	touch .kafka-$(KAFKA_VERSION)-ignorelist.tmp
 
-docker_build: .kafka-agent.tmp .tracing-agent.tmp .mirror-maker-agent.tmp .thirdparty-libs-$(THIRD_PARTY_LIBS).tmp .thirdparty-libs-cc.tmp .kafka-$(KAFKA_VERSION).tmp .kafka-$(KAFKA_VERSION)-ignorelist.tmp docker_build_default
+docker_build: .kafka-agent.tmp .strimzi-notifier.tmp .tracing-agent.tmp .mirror-maker-agent.tmp .thirdparty-libs-$(THIRD_PARTY_LIBS).tmp .thirdparty-libs-cc.tmp .kafka-$(KAFKA_VERSION).tmp .kafka-$(KAFKA_VERSION)-ignorelist.tmp docker_build_default
 	# Pull dependencies first
 
 docker_build:

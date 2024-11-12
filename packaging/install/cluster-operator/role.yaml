@@ -1,0 +1,18 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cruise-control
+  namespace: myproject
+rules:
+  - apiGroups:
+      - "kafka.strimzi.io"
+    resources:
+      - anomalies
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - delete
+      - patch
+      - update

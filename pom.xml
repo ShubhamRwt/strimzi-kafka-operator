@@ -204,6 +204,7 @@
         <module>kafka-init</module>
         <module>certificate-manager</module>
         <module>systemtest</module>
+        <module>strimzi-notifier</module>
     </modules>
 
     <dependencyManagement>
