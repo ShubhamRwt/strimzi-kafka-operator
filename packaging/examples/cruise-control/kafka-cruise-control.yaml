@@ -5,7 +5,7 @@ metadata:
 spec:
   kafka:
     version: 3.8.1
-    replicas: 3
+    replicas: 5
     listeners:
       - name: plain
         port: 9092
@@ -31,4 +31,15 @@ spec:
   entityOperator:
     topicOperator: {}
     userOperator: {}
-  cruiseControl: {}
+  cruiseControl:
+    config:
+      self.healing.enabled: true
+      broker.failure.alert.threshold.ms: 30000
+      metric.sampling.interval.ms: 60000
+      anomaly.detection.interval.ms: 60000
+      broker.failure.self.healing.threshold.ms: 60000
+      anomaly.notifier.class: io.strimzi.kafka.notifier.StrimziNotifier
+      webserver.security.enable: false
+      webserver.ssl.enable: false
+      self.healing.goals: com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkInboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.DiskCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.RackAwareGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.NetworkOutboundCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.CpuCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.ReplicaCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.DiskUsageDistributionGoal
+      anomaly.detection.goals: com.linkedin.kafka.cruisecontrol.analyzer.goals.RackAwareGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.MinTopicLeadersPerBrokerGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.ReplicaCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.DiskCapacityGoal,com.linkedin.kafka.cruisecontrol.analyzer.goals.DiskUsageDistributionGoal

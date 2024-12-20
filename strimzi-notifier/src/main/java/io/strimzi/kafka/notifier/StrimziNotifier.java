@@ -12,19 +12,29 @@ import com.linkedin.kafka.cruisecontrol.detector.MaintenanceEvent;
 import com.linkedin.kafka.cruisecontrol.detector.TopicAnomaly;
 import com.linkedin.kafka.cruisecontrol.detector.notifier.AnomalyNotificationResult;
 import com.linkedin.kafka.cruisecontrol.detector.notifier.SelfHealingNotifier;
-import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
-import io.fabric8.kubernetes.api.model.GenericKubernetesResourceBuilder;
+import io.fabric8.kubernetes.api.model.MicroTime;
+import io.fabric8.kubernetes.api.model.ObjectReference;
+import io.fabric8.kubernetes.api.model.ObjectReferenceBuilder;
+import io.fabric8.kubernetes.api.model.events.v1.EventBuilder;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
-import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
 
-import java.util.HashMap;
+import java.time.Clock;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 /**
  * Strimzi notifer class
  */
+
+
 public class StrimziNotifier extends SelfHealingNotifier {
+
+    protected static final String ACTION = "DetectedAnomalyGettingFixed";
+    private static final DateTimeFormatter K8S_MICROTIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'.'SSSSSSXXX");
+
+
 
     @Override
     public AnomalyNotificationResult onGoalViolation(GoalViolations goalViolations) {
@@ -64,34 +74,37 @@ public class StrimziNotifier extends SelfHealingNotifier {
 
         try (final KubernetesClient client = new KubernetesClientBuilder().build()) {
 
-            System.out.println("Hello");
-            Map<String, Object> spec = new HashMap<>();
+            MicroTime k8sEventTime = new MicroTime(K8S_MICROTIME.format(ZonedDateTime.now(Clock.systemDefaultZone())));
+            ObjectReference podReference = createPodReference(client);
+            String note = "Fixing the anomaly";
+            String type = "Normal";
 
-            spec.put("anomalyId", anomaly.anomalyId());
-            spec.put("operation", "");
-            spec.put("anomalyType", anomaly.anomalyType());
+            System.out.println("Event Published " + anomaly.anomalyId());
 
-            GenericKubernetesResource genericKubernetesResource = new GenericKubernetesResourceBuilder()
-                    .withApiVersion("kafka.strimzi.io/v1beta2")
-                    .withKind("Anomaly")
-                    .withNewMetadata()
-                        .withName("my-cluster-anomaly")
+            EventBuilder builder = new EventBuilder();
+
+            builder.withNewMetadata()
+                    .withName("my-cluster-" + anomaly.anomalyId())
+                    .withGenerateName("cruise-control-event")
                     .endMetadata()
-                    .addToAdditionalProperties("spec", spec)
-                    .build();
+                    .withAction(ACTION)
+                    .withReportingController("cruise-control")
+                    .withReportingInstance("cruise-control")
+                    .withRegarding(podReference)
+                    .withReason("Anomaly was detected in the cluster " + anomaly.anomalyType())
+                    .withType(type)
+                    .withEventTime(k8sEventTime)
+                    .withNote(note);
 
-            ResourceDefinitionContext context = new ResourceDefinitionContext.Builder()
-                    .withGroup("kafka.strimzi.io")
-                    .withVersion("v1beta2")
-                    .withKind("Anomaly")
-                    .withPlural("anomalies")
-                    .withNamespaced(true)
-                    .build();
-
-
-            client.genericKubernetesResources(context).inNamespace(client.getNamespace()).resource(genericKubernetesResource).create();
-
+            client.events().v1().events().inNamespace(client.getNamespace()).resource(builder.build()).create();
         }
+    }
+
+    ObjectReference createPodReference(KubernetesClient client) {
+        return new ObjectReferenceBuilder().withKind("Pod")
+                .withNamespace(client.getNamespace())
+                .withName("cruise-control-pod")
+                .build();
     }
 
     @Override

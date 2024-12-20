@@ -1,0 +1,40 @@
+{
+  "brokerCapacities": [
+    {
+      "brokerId": 0,
+      "capacity": {
+        "DISK": "100000",
+        "CPU": {
+          "num.cores": "1.0"
+        },
+        "NW_IN": "10000",
+        "NW_OUT": "10000"
+      },
+      "doc": "Capacity for Broker 0"
+    },
+    {
+      "brokerId": 1,
+      "capacity": {
+        "DISK": "100000",
+        "CPU": {
+          "num.cores": "1.0"
+        },
+        "NW_IN": "10000",
+        "NW_OUT": "10000"
+      },
+      "doc": "Capacity for Broker 1"
+    },
+    {
+      "brokerId": 2,
+      "capacity": {
+        "DISK": "100000",
+        "CPU": {
+          "num.cores": "1.0"
+        },
+        "NW_IN": "10000",
+        "NW_OUT": "10000"
+      },
+      "doc": "Capacity for Broker 2"
+    }
+  ]
+}

@@ -5,14 +5,9 @@ metadata:
   namespace: myproject
 rules:
   - apiGroups:
-      - "kafka.strimzi.io"
+      - "events.k8s.io" # new events api, used by cluster operator
     resources:
-      - anomalies
+      # The cluster operator needs to be able to create events
+      - events
     verbs:
-      - get
-      - list
-      - watch
       - create
-      - delete
-      - patch
-      - update

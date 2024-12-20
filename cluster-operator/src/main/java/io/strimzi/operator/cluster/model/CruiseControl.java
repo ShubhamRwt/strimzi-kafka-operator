@@ -263,8 +263,7 @@ public class CruiseControl extends AbstractModel implements SupportsMetrics, Sup
             String selfHealingGoalsString = configuration.getConfigOption(CruiseControlConfigurationParameters.SELF_HEALING_CONFIG_KEY.toString());
             List<String> selfHealingGoals = Arrays.asList(selfHealingGoalsString.split("\\s*,\\s*"));
             if (!selfHealingGoals.isEmpty()) {
-                throw new UnsupportedOperationException("Cruise Control's self healing functionality is not currently supported. Please remove " +
-                        CruiseControlConfigurationParameters.SELF_HEALING_CONFIG_KEY + " config");
+                configuration.setConfigOption(CruiseControlConfigurationParameters.SELF_HEALING_CONFIG_KEY.toString(), selfHealingGoalsString);
             }
         }
 
@@ -281,9 +280,7 @@ public class CruiseControl extends AbstractModel implements SupportsMetrics, Sup
         if (!anomalyDetectionGoals.isEmpty()) {
             // If the anomaly detection goals contain goals which are not in the default goals then the CC startup
             // checks will fail, so we make the anomaly goals match the default goals
-            configuration.setConfigOption(CruiseControlConfigurationParameters.ANOMALY_DETECTION_CONFIG_KEY.toString(), defaultGoalsString);
-            LOGGER.warnCr(reconciliation, "Anomaly goals contained goals which are not in the configured default goals. Anomaly goals have " +
-                    "been changed to match the specified default goals.");
+            configuration.setConfigOption(CruiseControlConfigurationParameters.ANOMALY_DETECTION_CONFIG_KEY.toString(), anomalyGoalsString);
         }
     }
 
