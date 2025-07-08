@@ -30,6 +30,15 @@ spec:
     topicOperator: {}
     userOperator: {}
   cruiseControl:
+    config:
+      self.healing.enabled: true
+      broker.failure.alert.threshold.ms: 30000
+      metric.sampling.interval.ms: 60000
+      anomaly.detection.interval.ms: 60000
+      broker.failure.self.healing.threshold.ms: 60000
+      self.healing.target.topic.replication.factor: 2
+      topic.anomaly.finder.class: com.linkedin.kafka.cruisecontrol.detector.TopicReplicationFactorAnomalyFinder
+      anomaly.notifier.class: io.strimzi.kafka.notifier.StrimziNotifier
     metricsConfig:
       type: jmxPrometheusExporter
       valueFrom:

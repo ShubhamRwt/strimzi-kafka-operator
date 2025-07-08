@@ -50,5 +50,20 @@ public enum KafkaAutoRebalanceState {
      *     <dt>Idle</dt><dd>if a scale up operation was requested, it was executed and completed successfully or failed.</dd>
      * </dl>
      */
-    RebalanceOnScaleUp
+    RebalanceOnScaleUp,
+
+    /**
+     * A rebalancing related to a scale up operation is running.
+     * Transitions to:
+     * <dl>
+     *     <dt>RebalanceOnScaleUp</dt><dd>if a rebalancing on scale up is still running or another one was requested while the first one ended.</dd>
+     *     <dt>RebalanceOnScaleDown</dt>
+     *     <dd>
+     *          if a scale down operation was requested, so the current rebalancing scale up is stopped (and queued) and
+     *          a new rebalancing scale down is started. The rebalancing scale up will be postponed.
+     *     </dd>
+     *     <dt>Idle</dt><dd>if a scale up operation was requested, it was executed and completed successfully or failed.</dd>
+     * </dl>
+     */
+    RebalanceOnAnomalyDetection
 }

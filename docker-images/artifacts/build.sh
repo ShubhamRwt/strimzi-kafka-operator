@@ -35,6 +35,8 @@ function third_party_libs {
         mkdir -p ./binaries/kafka-thirdparty-libs
         rm -f ./binaries/kafka-thirdparty-libs/${version_lib}.zip
         zip -j ./binaries/kafka-thirdparty-libs/${version_lib}.zip kafka-thirdparty-libs/${version_lib}/target/dependency/*
+        rm kafka-thirdparty-libs/${version_lib}/target/dependency/cruise-control-metrics-reporter-2.5.141.jar
+        cp kafka-thirdparty-libs/cc/cruise-control-metrics-reporter-2.5.141.jar kafka-thirdparty-libs/${version_lib}/target/dependency/
     done
 }
 
@@ -46,6 +48,12 @@ function cruise_control {
     mkdir -p ./binaries/kafka-thirdparty-libs
     rm -f ./binaries/kafka-thirdparty-libs/cc.zip
     zip -j ./binaries/kafka-thirdparty-libs/cc.zip kafka-thirdparty-libs/cc/target/dependency/*
+    rm kafka-thirdparty-libs/cc/target/dependency/cruise-control-2.5.141.jar
+    rm kafka-thirdparty-libs/cc/target/dependency/cruise-control-core-2.5.141.jar
+    rm kafka-thirdparty-libs/cc/target/dependency/cruise-control-metrics-reporter-2.5.141.jar
+    cp kafka-thirdparty-libs/cc/cruise-control-metrics-reporter-2.5.141.jar kafka-thirdparty-libs/cc/target/dependency/
+    cp kafka-thirdparty-libs/cc/cruise-control-core-2.5.141.jar kafka-thirdparty-libs/cc/target/dependency/
+    cp kafka-thirdparty-libs/cc/cruise-control-2.5.141.jar kafka-thirdparty-libs/cc/target/dependency/
 }
 
 function fetch_and_unpack_kafka_binaries {
